@@ -1,132 +1,158 @@
+import 'dart:convert';
 import 'package:camp_nest/core/model/questionnaire.dart';
-import 'package:camp_nest/core/utility/supabase_client.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:camp_nest/core/service/auth_service.dart';
+import 'package:http/http.dart' as http;
 
 class QuestionnaireService {
-  final SupabaseClient _client = SupabaseConfig.client;
-
-  // Add getter for client access
-  SupabaseClient get client => _client;
-
-  // Get all questionnaire questions
+  // GET /api/matches/questions
   Future<List<QuestionnaireQuestion>> getQuestions() async {
-    try {
-      final response = await _client
-          .from('questionnaire_questions')
-          .select()
-          .eq('is_active', true)
-          .order('order_index');
+    final auth = AuthService();
+    final baseUrl = auth.baseUrl;
+    final uri = Uri.parse('$baseUrl/api/matches/questions');
 
-      return response.map<QuestionnaireQuestion>((json) {
-        return QuestionnaireQuestion(
-          id: json['id'],
-          question: json['question'],
-          options: List<String>.from(json['options']),
-          type: json['question_type'],
-        );
-      }).toList();
-    } catch (e) {
-      throw Exception('Failed to get questions: ${e.toString()}');
+    final token = await auth.getToken();
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
     }
+
+    final resp = await http.get(uri, headers: headers);
+    print('GET /api/matches/questions ${resp.statusCode}: ${resp.body}');
+
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(resp.body);
+      final list =
+          data is List
+              ? data
+              : (data is Map<String, dynamic> && data['questions'] is List
+                  ? data['questions']
+                  : []);
+
+      return list
+          .map<QuestionnaireQuestion>(
+            (e) => QuestionnaireQuestion.fromJson(
+              (e as Map).cast<String, dynamic>(),
+            ),
+          )
+          .toList();
+    }
+
+    throw Exception(
+      'Failed to load questions: ${resp.statusCode} ${resp.body}',
+    );
   }
 
-  // Save user's answers using upsert to handle duplicates
+  // POST /api/matches/answers
   Future<void> saveAnswers(Map<String, QuestionnaireAnswer> answers) async {
-    try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
+    final auth = AuthService();
+    final baseUrl = auth.baseUrl;
+    final uri = Uri.parse('$baseUrl/api/matches/answers');
 
-      // Use upsert instead of delete + insert to handle duplicates
-      final answersToUpsert =
-          answers.values
-              .map(
-                (answer) => {
-                  'user_id': userId,
-                  'question_id': answer.questionId,
-                  'answers': answer.answers,
-                  'updated_at': DateTime.now().toIso8601String(),
-                },
-              )
-              .toList();
+    final token = await auth.getToken();
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      // Use upsert with onConflict to update existing records
-      await _client
-          .from('questionnaire_answers')
-          .upsert(
-            answersToUpsert,
-            onConflict:
-                'user_id,question_id', // Specify the unique constraint columns
-          );
-    } catch (e) {
-      throw Exception('Failed to save answers: ${e.toString()}');
+    final payload = answers.values.map((a) => a.toJson()).toList();
+    final body = jsonEncode(payload);
+
+    print('POST /api/matches/answers request body: ' + body);
+    final resp = await http.post(uri, headers: headers, body: body);
+    print('POST /api/matches/answers ${resp.statusCode}: ${resp.body}');
+
+    if (resp.statusCode == 200 || resp.statusCode == 201 || resp.statusCode == 204) {
+      return;
     }
+
+    throw Exception('Failed to save answers: ${resp.statusCode} ${resp.body}');
   }
 
-  // Alternative method: Save answers one by one with individual upserts
+  // POST /api/matches/answers (fallback single-item)
   Future<void> saveAnswersIndividually(
     Map<String, QuestionnaireAnswer> answers,
   ) async {
-    try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
+    final auth = AuthService();
+    final baseUrl = auth.baseUrl;
+    final uri = Uri.parse('$baseUrl/api/matches/answers');
 
-      // Save each answer individually to avoid batch conflicts
-      for (final answer in answers.values) {
-        await _client.from('questionnaire_answers').upsert({
-          'user_id': userId,
-          'question_id': answer.questionId,
-          'answers': answer.answers,
-          'updated_at': DateTime.now().toIso8601String(),
-        });
+    final token = await auth.getToken();
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+
+    for (final a in answers.values) {
+      final body = jsonEncode([a.toJson()]);
+      print('POST /api/matches/answers (single) request body: ' + body);
+      final resp = await http.post(uri, headers: headers, body: body);
+      print('POST /api/matches/answers (single) ${resp.statusCode}: ${resp.body}');
+
+      if (!(resp.statusCode == 200 || resp.statusCode == 201 || resp.statusCode == 204)) {
+        throw Exception('Failed to save answer for ${a.questionId}: ${resp.statusCode} ${resp.body}');
       }
-    } catch (e) {
-      throw Exception('Failed to save answers: ${e.toString()}');
     }
   }
 
-  // Get user's answers
+  // GET /api/matches/answers (user inferred from token)
   Future<Map<String, QuestionnaireAnswer>> getUserAnswers(String userId) async {
-    try {
-      final response = await _client
-          .from('questionnaire_answers')
-          .select()
-          .eq('user_id', userId);
+    final auth = AuthService();
+    final baseUrl = auth.baseUrl;
+    final uri = Uri.parse('$baseUrl/api/matches/answers');
 
-      final Map<String, QuestionnaireAnswer> answers = {};
-      for (final json in response) {
-        final answer = QuestionnaireAnswer(
-          questionId: json['question_id'],
-          answers: List<String>.from(json['answers']),
-        );
-        answers[json['question_id']] = answer;
+    final token = await auth.getToken();
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+
+    final resp = await http.get(uri, headers: headers);
+    print('GET /api/matches/answers ${resp.statusCode}: ${resp.body}');
+
+    if (resp.statusCode == 200) {
+      try {
+        final data = jsonDecode(resp.body);
+        if (data is List) {
+          final list = data
+              .map((e) => QuestionnaireAnswer.fromJson((e as Map).cast<String, dynamic>()))
+              .toList();
+          return {for (final a in list) a.questionId: a};
+        }
+      } catch (e) {
+        print('GET /api/matches/answers parse error: $e');
       }
-
-      return answers;
-    } catch (e) {
-      throw Exception('Failed to get user answers: ${e.toString()}');
+      return {};
     }
+
+    throw Exception('Failed to fetch answers: ${resp.statusCode} ${resp.body}');
   }
 
-  // Check if user has completed questionnaire
+  // GET /api/matches/status (user inferred from token)
   Future<bool> hasUserCompletedQuestionnaire(String userId) async {
-    try {
-      final response = await _client
-          .from('questionnaire_answers')
-          .select('question_id')
-          .eq('user_id', userId);
+    final auth = AuthService();
+    final baseUrl = auth.baseUrl;
+    final uri = Uri.parse('$baseUrl/api/matches/status');
 
-      final questionsResponse = await _client
-          .from('questionnaire_questions')
-          .select('id')
-          .eq('is_active', true);
+    final token = await auth.getToken();
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (token != null) headers['Authorization'] = 'Bearer $token';
 
-      return response.length == questionsResponse.length;
-    } catch (e) {
+    final resp = await http.get(uri, headers: headers);
+    print('GET /api/matches/status ${resp.statusCode}: ${resp.body}');
+
+    if (resp.statusCode == 200) {
+      final raw = resp.body.trim();
+      // Handle plain text boolean
+      if (raw.toLowerCase() == 'true') return true;
+      if (raw.toLowerCase() == 'false') return false;
+
+      // Try JSON
+      try {
+        final data = jsonDecode(resp.body);
+        if (data is bool) return data;
+        if (data is Map<String, dynamic>) {
+          if (data['completed'] is bool) return data['completed'] as bool;
+          if (data['status'] is String) return (data['status'] as String).toLowerCase() == 'completed';
+        }
+      } catch (_) {}
+
       return false;
     }
+
+    throw Exception('Failed to fetch questionnaire status: ${resp.statusCode} ${resp.body}');
   }
 }

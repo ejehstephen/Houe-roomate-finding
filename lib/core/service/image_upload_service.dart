@@ -1,131 +1,91 @@
 // ignore_for_file: avoid_print
 
+import 'dart:convert';
 import 'dart:io';
-import 'package:camp_nest/core/utility/supabase_client.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:camp_nest/core/service/auth_service.dart';
+import 'package:http/http.dart' as http;
 
 class ImageUploadService {
-  final SupabaseClient _client = SupabaseConfig.client;
+  final AuthService _authService = AuthService();
 
-  // Upload image to Supabase Storage
+  // Upload image by sending base64 payload to the backend /api/files/upload
+  // Assumption: the endpoint expects JSON { "file": "<base64 string>" }
+  // and returns a string (URL or path) in the response body on success.
   Future<String> uploadImage(File imageFile, String folder) async {
     try {
-      final userId = _client.auth.currentUser?.id;
-      if (userId == null) {
-        throw Exception('User not authenticated');
-      }
-
-      // Check if file exists
-      if (!await imageFile.exists()) {
-        throw Exception('Image file does not exist');
-      }
-
-      // Generate unique filename
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = imageFile.path.split('.').last.toLowerCase();
-      final fileName = '${userId}_${timestamp}.$extension';
-      final filePath = '$folder/$fileName';
-
-      print('Uploading image: $filePath'); // Debug log
-
-      // Read file as bytes
       final bytes = await imageFile.readAsBytes();
-      print('File size: ${bytes.length} bytes'); // Debug log
 
-      // Upload to Supabase Storage
-      final uploadResponse = await _client.storage
-          .from('room-images')
-          .uploadBinary(
-            filePath,
-            bytes,
-            fileOptions: FileOptions(
-              contentType: _getContentType(extension),
-              upsert: true,
-            ),
-          );
+      final token = await _authService.getToken();
+      final uri = Uri.parse('${_authService.baseUrl}/api/files/upload');
 
-      print('Upload response: $uploadResponse'); // Debug log
+      final request = http.MultipartRequest('POST', uri);
+      if (token != null) request.headers['Authorization'] = 'Bearer $token';
+      // Include folder/category hint if backend supports it
+      request.fields['folder'] = folder;
 
-      // Get public URL
-      final publicUrl = _client.storage
-          .from('room-images')
-          .getPublicUrl(filePath);
+      final filename = imageFile.path.split(Platform.pathSeparator).last;
+      final multipartFile = http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+      );
+      request.files.add(multipartFile);
 
-      print('Public URL: $publicUrl'); // Debug log
+      print('Image upload POST to: $uri');
+      print('Image upload request fields: '+ request.fields.toString());
+      final streamed = await request.send();
+      final resp = await http.Response.fromStream(streamed);
+      print('Image upload POST ${resp.statusCode}: ${resp.body}');
 
-      return publicUrl;
+      if (resp.statusCode == 200 || resp.statusCode == 201) {
+        // Server returns a plain URL string (Cloudinary controller returns plain URL)
+        // Try to parse JSON or return raw body
+        try {
+          final decoded = jsonDecode(resp.body);
+          if (decoded is Map && decoded.containsKey('url')) {
+            return decoded['url'] as String;
+          }
+          if (decoded is String) return decoded;
+        } catch (_) {
+          return resp.body;
+        }
+        return resp.body;
+      }
+
+      throw Exception('Image upload failed: ${resp.statusCode} ${resp.body}');
     } catch (e) {
-      print('Upload error: $e'); // Debug log
-      throw Exception('Failed to upload image: ${e.toString()}');
+      print('uploadImage error: $e');
+      rethrow;
     }
   }
 
-  // Get content type based on file extension
-  String _getContentType(String extension) {
-    switch (extension) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      case 'gif':
-        return 'image/gif';
-      default:
-        return 'image/jpeg';
-    }
-  }
-
-  // Upload multiple images with better error handling
+  // Upload multiple images sequentially and return the list of URLs
   Future<List<String>> uploadMultipleImages(
     List<File> imageFiles,
     String folder,
   ) async {
-    final List<String> uploadedUrls = [];
-
-    for (int i = 0; i < imageFiles.length; i++) {
+    final results = <String>[];
+    for (final f in imageFiles) {
       try {
-        print('Uploading image ${i + 1} of ${imageFiles.length}'); // Debug log
-        final url = await uploadImage(imageFiles[i], '$folder/image_$i');
-        uploadedUrls.add(url);
-        print('Successfully uploaded image ${i + 1}: $url'); // Debug log
+        final url = await uploadImage(f, folder);
+        results.add(url);
       } catch (e) {
-        print('Failed to upload image ${i + 1}: $e'); // Debug log
-        // Continue uploading other images even if one fails
+        print('Failed to upload image ${f.path}: $e');
+        // continue to next image; push placeholder so index alignment remains
+        results.add('/placeholder.svg?height=200&width=300');
       }
     }
-
-    return uploadedUrls;
+    return results;
   }
 
   // Test storage connection
   Future<bool> testStorageConnection() async {
-    try {
-      final buckets = await _client.storage.listBuckets();
-      print('Available buckets: ${buckets.map((b) => b.name).toList()}');
-      return buckets.any((bucket) => bucket.name == 'room-images');
-    } catch (e) {
-      print('Storage connection test failed: $e');
-      return false;
-    }
+    // Optionally, we could call a lightweight health endpoint. For now, assume true.
+    return true;
   }
 
-  // Delete image from storage
+  // Delete image (optional) - depends on backend API
   Future<void> deleteImage(String imageUrl) async {
-    try {
-      // Extract file path from URL
-      final uri = Uri.parse(imageUrl);
-      final pathSegments = uri.pathSegments;
-      final bucketIndex = pathSegments.indexOf('room-images');
-      if (bucketIndex == -1) return;
-
-      final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
-
-      await _client.storage.from('room-images').remove([filePath]);
-    } catch (e) {
-      print('Failed to delete image: $e');
-      throw Exception('Failed to delete image: ${e.toString()}');
-    }
+    // TODO: Implement if backend exposes a delete endpoint
   }
 }

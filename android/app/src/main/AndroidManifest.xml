@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <application
         android:label="camp_nest"
         android:name="${applicationName}"
@@ -31,15 +34,23 @@
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    <!-- Required to query activities that can process text, see:
-         https://developer.android.com/training/package-visibility and
-         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+        <!-- Required to query activities that can process text, and to allow
+             checking whether WhatsApp is installed on Android 11+ (package
+             visibility). See:
+             https://developer.android.com/training/package-visibility
+             https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT
 
-         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
-        </intent>
-    </queries>
+             The <queries> element must be a direct child of <manifest>. Avoid
+             requesting QUERY_ALL_PACKAGES; instead list the specific packages you
+             need to detect. -->
+        <queries>
+            <intent>
+                <action android:name="android.intent.action.PROCESS_TEXT"/>
+                <data android:mimeType="text/plain"/>
+            </intent>
+
+            <!-- WhatsApp (regular) and WhatsApp Business -->
+            <package android:name="com.whatsapp" />
+            <package android:name="com.whatsapp.w4b" />
+        </queries>
 </manifest>

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -25,6 +26,24 @@ class _SplashScreenState extends State<SplashScreen>
       end: 1.0,
     ).animate(_animationController);
     _animationController.forward();
+
+    // Debug: Check environment configuration on startup
+    _checkEnvironmentConfig();
+  }
+
+  void _checkEnvironmentConfig() {
+    print('🚀 DEBUG SPLASH: Environment check on startup');
+    print('🚀 DEBUG SPLASH: API_BASE_URL = ${dotenv.env['API_BASE_URL']}');
+    print('🚀 DEBUG SPLASH: All env vars: ${dotenv.env}');
+
+    if (dotenv.env['API_BASE_URL']?.isEmpty ?? true) {
+      print('❌ WARNING: API_BASE_URL is not set or empty!');
+    } else if (!dotenv.env['API_BASE_URL']!.contains('onrender.com')) {
+      print('⚠️ WARNING: API_BASE_URL does not contain onrender.com domain');
+      print('⚠️ Current value: ${dotenv.env['API_BASE_URL']}');
+    } else {
+      print('✅ API_BASE_URL correctly configured for Render');
+    }
   }
 
   @override
@@ -64,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 32),
                     const Text(
-                      'RoomMatch',
+                      'CampNest',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -73,7 +92,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Find your perfect roommate\nand ideal living space',
+                      'Find your perfect RoomMate\nand ideal living space',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 16, color: Colors.white70),
                     ),

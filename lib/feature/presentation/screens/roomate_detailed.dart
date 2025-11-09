@@ -1,18 +1,24 @@
 import 'package:camp_nest/core/model/room_listing.dart';
+import 'package:camp_nest/core/theme/app_theme.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
+import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
+import 'package:camp_nest/feature/presentation/widget/Media.dart';
+import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class RoomDetailScreen extends StatefulWidget {
+class RoomDetailScreen extends ConsumerStatefulWidget {
   final RoomListingModel listing;
 
   const RoomDetailScreen({super.key, required this.listing});
 
   @override
-  State<RoomDetailScreen> createState() => _RoomDetailScreenState();
+  ConsumerState<RoomDetailScreen> createState() => _RoomDetailScreenState();
 }
 
-class _RoomDetailScreenState extends State<RoomDetailScreen> {
+class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
 
@@ -23,39 +29,104 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
   }
 
   Future<void> _contactViaWhatsApp() async {
-    // In a real app, you'd get the owner's phone number from the database
-    const phoneNumber = '+1234567890'; // Placeholder phone number
+    final phone = widget.listing.ownerPhone;
+    final backendLink = widget.listing.whatsappLink;
     final message = Uri.encodeComponent(
-      'Hi! I\'m interested in your room listing: "${widget.listing.title}". Can we discuss more details?',
+      "Hi! I saw your room listing: ${widget.listing.title}. Can we discuss more details?",
     );
 
-    final whatsappUrl = 'https://wa.me/$phoneNumber?text=$message';
+    // Debug
+    print('contactViaWhatsApp: backendLink=$backendLink phone=$phone');
 
-    try {
-      if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
-        await launchUrl(
-          Uri.parse(whatsappUrl),
+    // 1) Try backend-provided link first (it's already formatted/encoded server-side)
+    if (backendLink != null && backendLink.isNotEmpty) {
+      try {
+        final uri = Uri.parse(backendLink);
+        print('Trying backend whatsappLink: $uri');
+        final launched = await launchUrl(
+          uri,
           mode: LaunchMode.externalApplication,
         );
-      } else {
-        // Fallback: copy phone number to clipboard
-        await Clipboard.setData(const ClipboardData(text: phoneNumber));
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'WhatsApp not available. Phone number copied to clipboard.',
-              ),
-            ),
-          );
+        print('launchUrl(backendLink) returned: $launched');
+        if (launched) return;
+      } catch (e) {
+        print('Error parsing/launching backendLink: $e');
+      }
+    }
+
+    // 2) Build candidate phone formats from ownerPhone and try deep link then wa.me
+    if (phone != null && phone.isNotEmpty) {
+      final cleaned = phone.replaceAll(RegExp(r'\D'), '');
+      final candidates = <String>{};
+      if (cleaned.isNotEmpty) candidates.add(cleaned);
+
+      // If starts with 0 -> try without leading zeros and with country code 234
+      if (cleaned.startsWith('0')) {
+        final withoutZero = cleaned.replaceFirst(RegExp(r'^0+'), '');
+        if (withoutZero.isNotEmpty) {
+          candidates.add(withoutZero);
+          candidates.add('234$withoutZero');
         }
       }
-    } catch (e) {
+
+      // If short (likely local), try prefixing 234
+      if (cleaned.length <= 10 && !cleaned.startsWith('234')) {
+        candidates.add('234$cleaned');
+      }
+
+      // Also try with + prefix
+      final candidatesWithPlus =
+          candidates.map((c) => c.startsWith('+') ? c : '+$c').toList();
+
+      for (final cand in [...candidates, ...candidatesWithPlus]) {
+        final candDigits = cand.replaceAll(RegExp(r'[^0-9]'), '');
+        final schemeUri = Uri.parse(
+          'whatsapp://send?phone=$candDigits&text=$message',
+        );
+        print('Trying whatsapp scheme: $schemeUri');
+        try {
+          final launched = await launchUrl(
+            schemeUri,
+            mode: LaunchMode.externalApplication,
+          );
+          print('launchUrl(whatsapp scheme for $cand) returned: $launched');
+          if (launched) return;
+        } catch (e) {
+          print('whatsapp scheme launch error for $cand: $e');
+        }
+
+        final webUri = Uri.parse('https://wa.me/$candDigits?text=$message');
+        print('Trying wa.me web link: $webUri');
+        try {
+          final launched = await launchUrl(
+            webUri,
+            mode: LaunchMode.externalApplication,
+          );
+          print('launchUrl(wa.me for $cand) returned: $launched');
+          if (launched) return;
+        } catch (e) {
+          print('wa.me launch error for $cand: $e');
+        }
+      }
+    }
+
+    // 3) Nothing launched — fallback: copy phone to clipboard or inform user
+    if (phone != null && phone.isNotEmpty) {
+      await Clipboard.setData(ClipboardData(text: phone));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening WhatsApp: ${e.toString()}'),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text(
+              'WhatsApp not available. Phone number copied to clipboard.',
+            ),
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No WhatsApp contact available for this listing.'),
           ),
         );
       }
@@ -71,54 +142,71 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
     );
   }
 
+  // Create a list of controllers to manage them
+  List<ChewieController?> _chewieControllers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize a list of controllers, one for each media item
+    _chewieControllers = List.generate(
+      widget.listing.images.length,
+      (index) => null,
+    );
+  }
+
+  void _handlePageChanged(int index) {
+    // Pause the video that was just scrolled away
+    if (_chewieControllers[_currentImageIndex] != null) {
+      _chewieControllers[_currentImageIndex]!.pause();
+    }
+
+    // Play the video on the new page, if it's a video
+    if (_chewieControllers[index] != null) {
+      _chewieControllers[index]!.play();
+    }
+
+    setState(() {
+      _currentImageIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.textPrimary,
       body: CustomScrollView(
         slivers: [
           // App Bar with Images
           SliverAppBar(
-            expandedHeight: 300,
+            expandedHeight: 450,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               background: Stack(
                 children: [
                   // Image carousel
-                  PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentImageIndex = index;
-                      });
-                    },
-                    itemCount: widget.listing.images.length,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          image:
-                              widget.listing.images.isNotEmpty
-                                  ? DecorationImage(
-                                    image: NetworkImage(
-                                      widget.listing.images[index],
-                                    ),
-                                    fit: BoxFit.cover,
-                                  )
-                                  : null,
-                          color: Colors.grey[300],
-                        ),
-                        child:
-                            widget.listing.images.isEmpty
-                                ? const Center(
-                                  child: Icon(
-                                    Icons.home,
-                                    size: 80,
-                                    color: Colors.grey,
-                                  ),
-                                )
-                                : null,
-                      );
-                    },
-                  ),
+                  if (widget.listing.images.isEmpty)
+                    _buildPlaceholder(), // Handle empty case directly
+                  if (widget.listing.images.isNotEmpty)
+                    PageView.builder(
+                      controller: _pageController,
+                      onPageChanged: _handlePageChanged,
+                      itemCount:
+                          widget.listing.images.isEmpty
+                              ? 1
+                              : widget.listing.images.length,
+                      itemBuilder: (context, index) {
+                        if (widget.listing.images.isEmpty) {
+                          return _buildPlaceholder(); // Your placeholder function
+                        }
+
+                        // Use the new reusable widget here
+                        return MediaDisplayWidget(
+                          key: ValueKey(widget.listing.images[index]),
+                          mediaUrl: widget.listing.images[index],
+                        );
+                      },
+                    ),
 
                   // Image indicators
                   if (widget.listing.images.length > 1)
@@ -151,12 +239,92 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
               ),
             ),
             actions: [
-              IconButton(
-                onPressed: _shareRoom,
-                icon: const Icon(Icons.share),
-                style: IconButton.styleFrom(backgroundColor: Colors.black26),
+              // Delete button - only visible to owner/creator
+              Builder(
+                builder: (context) {
+                  final currentUser = ref.watch(authProvider).user;
+                  final isOwner =
+                      currentUser != null &&
+                      currentUser.id == widget.listing.ownerId;
+                  if (isOwner) {
+                    return IconButton(
+                      onPressed: () async {
+                        final confirmed = await showDialog<bool>(
+                          context: context,
+                          builder:
+                              (ctx) => AlertDialog(
+                                title: const Text('Delete listing'),
+                                content: const Text(
+                                  'Are you sure you want to delete this listing? This action cannot be undone.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed:
+                                        () => Navigator.of(ctx).pop(false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed:
+                                        () => Navigator.of(ctx).pop(true),
+                                    child: const Text('Delete'),
+                                  ),
+                                ],
+                              ),
+                        );
+
+                        if (confirmed == true) {
+                          try {
+                            await ref
+                                .read(listingsProvider.notifier)
+                                .deleteListing(widget.listing.id);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Listing deleted'),
+                                ),
+                              );
+                              Navigator.of(context).pop();
+                            }
+                          } catch (e) {
+                            // Refresh the listings to clear any stale error state and show latest data
+                            try {
+                              await ref
+                                  .read(listingsProvider.notifier)
+                                  .loadListings();
+                            } catch (_) {}
+
+                            String message = 'Failed to delete listing';
+                            if (e.toString().contains('403')) {
+                              message =
+                                  'You can only delete your own listings.';
+                            } else {
+                              message = '$message: ${e.toString()}';
+                            }
+
+                            if (mounted) {
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text(message)));
+                            }
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.delete_forever),
+                      color: Colors.redAccent,
+                    );
+                  }
+
+                  // default: share icon for non-owners
+                  return IconButton(
+                    onPressed: _shareRoom,
+                    icon: const Icon(Icons.share),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black26,
+                    ),
+                  );
+                },
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
             ],
           ),
 
@@ -189,7 +357,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          '\$${widget.listing.price.toInt()}/month',
+                          '\N${widget.listing.price.toInt()}/yr',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -205,50 +373,38 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   // Location and Owner
                   Row(
                     children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.grey[600],
-                        size: 20,
-                      ),
+                      Icon(Icons.location_on, color: Colors.white, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           widget.listing.location,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[700],
-                          ),
+                          style: TextStyle(fontSize: 19, color: Colors.white),
                         ),
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 8),
+                  // const SizedBox(height: 8),
+
+                  // Row(
+                  //   children: [
+                  //     Icon(Icons.person, color: Colors.grey[600], size: 20),
+                  //     const SizedBox(width: 8),
+                  //     Text(
+                  //       'Listed by ${widget.listing.ownerName}',
+                  //       style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  //     ),
+                  //   ],
+                  // ),
+                  const SizedBox(height: 12),
 
                   Row(
                     children: [
-                      Icon(Icons.person, color: Colors.grey[600], size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Listed by ${widget.listing.ownerName}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        color: Colors.grey[600],
-                        size: 20,
-                      ),
+                      Icon(Icons.calendar_today, color: Colors.white, size: 20),
                       const SizedBox(width: 8),
                       Text(
                         'Available from ${widget.listing.availableFrom.day}/${widget.listing.availableFrom.month}/${widget.listing.availableFrom.year}',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        style: TextStyle(fontSize: 14, color: Colors.white),
                       ),
                     ],
                   ),
@@ -350,7 +506,10 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                             Expanded(
                               child: Text(
                                 rule,
-                                style: const TextStyle(fontSize: 16),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],
@@ -371,7 +530,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: Colors.grey,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
@@ -398,7 +557,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 100), // Space for bottom buttons
+                  const SizedBox(height: 90), // Space for bottom buttons
                 ],
               ),
             ),
@@ -410,7 +569,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color: AppTheme.textPrimary,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
@@ -428,6 +587,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 label: const Text('Share'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  backgroundColor: AppTheme.textPrimary,
                 ),
               ),
             ),
@@ -439,7 +599,7 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
                 icon: const Icon(Icons.chat),
                 label: const Text('Contact via WhatsApp'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366), // WhatsApp green
+                  backgroundColor: Colors.green, // WhatsApp green
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -473,4 +633,13 @@ class _RoomDetailScreenState extends State<RoomDetailScreen> {
         return Icons.check_circle;
     }
   }
+}
+
+Widget _buildPlaceholder() {
+  return Container(
+    color: Colors.grey[200],
+    child: Center(
+      child: Icon(Icons.image_not_supported, size: 50, color: Colors.grey[400]),
+    ),
+  );
 }

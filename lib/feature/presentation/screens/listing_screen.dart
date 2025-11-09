@@ -1,4 +1,6 @@
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
+import 'package:camp_nest/core/model/room_listing.dart';
+import 'package:camp_nest/core/service/listing_service.dart';
 import 'package:camp_nest/feature/presentation/screens/post_listing_screen.dart';
 import 'package:camp_nest/feature/presentation/widget/roomcard.dart';
 import 'package:flutter/material.dart';
@@ -12,20 +14,27 @@ class ListingsScreen extends ConsumerStatefulWidget {
 }
 
 class _ListingsScreenState extends ConsumerState<ListingsScreen> {
-  double _maxPrice = 1000;
+  // Price slider bounds. Use a high top value and interpret top as 'no max filter'.
+  final double _priceMin = 200;
+  final double _priceMax = 200000;
+  double _maxPrice = 200000;
   String _selectedGender = 'any';
   String _searchLocation = '';
+  List<RoomListingModel>? _searchResults;
+  bool _isSearching = false;
 
   @override
   Widget build(BuildContext context) {
     final listingsState = ref.watch(listingsProvider);
-    final filteredListings = ref
-        .read(listingsProvider.notifier)
-        .filterListings(
-          maxPrice: _maxPrice,
-          gender: _selectedGender == 'any' ? null : _selectedGender,
-          location: _searchLocation.isEmpty ? null : _searchLocation,
-        );
+    final filteredListings =
+        _searchResults ??
+        ref
+            .read(listingsProvider.notifier)
+            .filterListings(
+              maxPrice: _maxPrice,
+              gender: _selectedGender == 'any' ? null : _selectedGender,
+              location: _searchLocation.isEmpty ? null : _searchLocation,
+            );
 
     return Scaffold(
       // appBar: AppBar(leading: BackButton()),
@@ -64,13 +73,18 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                   setState(() {
                     _searchLocation = value;
                   });
+                  print('ListingScreen: search input changed -> "${value}"');
                 },
               ),
             ),
           ),
 
           // Listings content
-          if (listingsState.isLoading)
+          if (_isSearching)
+            const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (listingsState.isLoading && _searchResults == null)
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator()),
             )
@@ -127,17 +141,17 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
       ),
 
       // Floating Action Button for post creation
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const PostListingScreen()),
-          );
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Post Room'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-      ),
+      // floatingActionButton: FloatingActionButton.extended(
+      //   onPressed: () {
+      //     Navigator.of(context).push(
+      //       MaterialPageRoute(builder: (context) => const PostListingScreen()),
+      //     );
+      //   },
+      //   icon: const Icon(Icons.add),
+      //   label: const Text('Post Room'),
+      //   backgroundColor: Theme.of(context).colorScheme.primary,
+      //   foregroundColor: Colors.white,
+      // ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
@@ -164,12 +178,14 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      Text('Max Price: \$${_maxPrice.round()}'),
+                      Text(
+                        'Max Price: ${_maxPrice >= _priceMax ? 'No max' : '\$${_maxPrice.round()}'}',
+                      ),
                       Slider(
                         value: _maxPrice,
-                        min: 200,
-                        max: 1500,
-                        divisions: 26,
+                        min: _priceMin,
+                        max: _priceMax,
+                        divisions: 100,
                         onChanged: (value) {
                           setModalState(() {
                             _maxPrice = value;
@@ -222,8 +238,68 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () {
-                                setState(() {});
+                              onPressed: () async {
+                                // Perform search locally so Home/global listings aren't modified
+                                setState(() {
+                                  _isSearching = true;
+                                  _searchResults = null;
+                                });
+
+                                try {
+                                  final service = ref.read(
+                                    listingsServiceProvider,
+                                  );
+                                  final maxPriceParam =
+                                      _maxPrice >= _priceMax ? null : _maxPrice;
+                                  print(
+                                    'ListingScreen: starting search with location="${_searchLocation.isEmpty ? '' : _searchLocation}", maxPrice=$maxPriceParam, gender=${_selectedGender}',
+                                  );
+                                  final results = await service.searchListings(
+                                    location:
+                                        _searchLocation.isEmpty
+                                            ? null
+                                            : _searchLocation,
+                                    minPrice: null,
+                                    maxPrice: maxPriceParam,
+                                    genderPreference:
+                                        _selectedGender == 'any'
+                                            ? null
+                                            : _selectedGender,
+                                    page: 0,
+                                    size: 50,
+                                  );
+
+                                  print(
+                                    'ListingScreen: search completed, results count=${results.length}',
+                                  );
+                                  if (results.isNotEmpty) {
+                                    final sample =
+                                        results
+                                            .take(5)
+                                            .map((r) => r.title)
+                                            .toList();
+                                    print(
+                                      'ListingScreen: sample titles=${sample}',
+                                    );
+                                  }
+
+                                  setState(() {
+                                    _searchResults = results;
+                                  });
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Search failed: ${e.toString()}',
+                                      ),
+                                    ),
+                                  );
+                                } finally {
+                                  setState(() {
+                                    _isSearching = false;
+                                  });
+                                }
+
                                 Navigator.pop(context);
                               },
                               child: const Text('Apply'),

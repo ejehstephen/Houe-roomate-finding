@@ -31,16 +31,26 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     double? maxPrice,
     String? location,
     String? genderPreference,
+    double? minPrice,
+    int page = 0,
+    int size = 10,
+    String sort = 'createdAt',
+    String order = 'desc',
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final listings = await _listingsService.getListings(
-        maxPrice: maxPrice,
+      final listings = await _listingsService.searchListings(
         location: location,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
         genderPreference: genderPreference,
+        page: page,
+        size: size,
+        sort: sort,
+        order: order,
       );
-      state = state.copyWith(listings: listings, isLoading: false);
+      state = state.copyWith(listings: listings, isLoading: false, error: null);
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
@@ -50,11 +60,62 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final newListing = await _listingsService.createListing(listing);
-      state = state.copyWith(
-        listings: [...state.listings, newListing],
-        isLoading: false,
-      );
+      // Debug: log rules received from UI before sending to service
+      print('ListingsNotifier.addListing - listing.rules: ${listing.rules}');
+
+      final newListing = await _listingsService.createListing(listing: listing);
+      if (newListing != null) {
+        // If backend didn't persist ownerPhone or whatsappLink, fall back to the
+        // values provided in the original listing (from the post form).
+        // If backend didn't provide a whatsappLink but returned ownerPhone,
+        // construct a wa.me link client-side so the UI can open WhatsApp.
+        String? clientWhatsapp =
+            newListing.whatsappLink ?? listing.whatsappLink;
+        if ((clientWhatsapp == null || clientWhatsapp.isEmpty) &&
+            (newListing.ownerPhone ?? listing.ownerPhone) != null) {
+          final phone = (newListing.ownerPhone ?? listing.ownerPhone)!;
+          final sanitized = phone.replaceAll(RegExp(r'[\s\-()]+'), '');
+          final normalized =
+              sanitized.startsWith('+') ? sanitized.substring(1) : sanitized;
+          clientWhatsapp =
+              'https://wa.me/$normalized?text=' +
+              Uri.encodeComponent(
+                'Hi! I\'m interested in your room listing: "${newListing.title}".',
+              );
+        }
+
+        final mergedListing = RoomListingModel(
+          id: newListing.id,
+          title: newListing.title,
+          description: newListing.description,
+          price: newListing.price,
+          location: newListing.location,
+          images: newListing.images,
+          ownerId: newListing.ownerId,
+          ownerName: newListing.ownerName,
+          ownerPhone: newListing.ownerPhone ?? listing.ownerPhone,
+          whatsappLink:
+              newListing.whatsappLink ?? listing.whatsappLink ?? clientWhatsapp,
+          amenities:
+              newListing.amenities.isNotEmpty
+                  ? newListing.amenities
+                  : listing.amenities,
+          // If backend returned an empty rules list for some reason, fall
+          // back to the client-provided rules so the listing shows what the
+          // user actually entered in the post form.
+          rules:
+              (newListing.rules.isNotEmpty) ? newListing.rules : listing.rules,
+          gender: newListing.gender,
+          availableFrom: newListing.availableFrom,
+          isActive: newListing.isActive,
+        );
+
+        // Prepend the new listing so it appears at the top of the list immediately
+        state = state.copyWith(
+          listings: [mergedListing, ...state.listings],
+          isLoading: false,
+        );
+      }
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
       rethrow; // Re-throw so the UI can handle it
@@ -76,14 +137,34 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
   }
 
   Future<void> deleteListing(String listingId) async {
+    state = state.copyWith(isLoading: true, error: null);
     try {
       await _listingsService.deleteListing(listingId);
       final updatedListings =
           state.listings.where((l) => l.id != listingId).toList();
-      state = state.copyWith(listings: updatedListings);
+      state = state.copyWith(listings: updatedListings, isLoading: false);
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      // don't persist the error into global listings state (that hides the list);
+      // let callers handle the error so they can show context-appropriate UI.
+      state = state.copyWith(isLoading: false);
+      rethrow;
     }
+  }
+
+  // Load all listings (no search filters)
+  Future<void> loadAllListings() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final listings = await _listingsService.getAllListings();
+      state = state.copyWith(listings: listings, isLoading: false, error: null);
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+    }
+  }
+
+  // Clear error state
+  void clearError() {
+    state = state.copyWith(error: null);
   }
 
   List<RoomListingModel> filterListings({

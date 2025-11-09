@@ -1,4 +1,7 @@
+import 'package:camp_nest/core/extension/error_extension.dart';
+import 'package:camp_nest/core/service/auth_service.dart';
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
+import 'package:camp_nest/feature/presentation/screens/Verification.dart';
 import 'package:camp_nest/feature/presentation/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -51,23 +54,46 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     return null;
   }
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
       if (_isSignUp) {
-        ref
+        final result = await ref
             .read(authProvider.notifier)
             .signUp(
-              name: _nameController.text,
-              email: _emailController.text,
-              password: _passwordController.text,
-              school: _schoolController.text,
-              age: int.parse(_ageController.text),
-              gender: _selectedGender,
+              name: _nameController.text.trim(),
+              email: _emailController.text.trim(),
+              password: _passwordController.text.trim(),
+              school: _schoolController.text.trim(),
+              age: int.parse(_ageController.text.trim()),
+              gender: _selectedGender.trim(),
             );
+
+        if (result['success'] == true) {
+          // ✅ Switch to sign in mode after successful registration
+          if (mounted) {
+            setState(() {
+              _isSignUp = false;
+            });
+          }
+        } else {
+          // Show clean error feedback
+          result['error'].showError(context);
+        }
       } else {
-        ref
+        final result = await ref
             .read(authProvider.notifier)
-            .signIn(_emailController.text, _passwordController.text);
+            .signIn(
+              _emailController.text.trim(),
+              _passwordController.text.trim(),
+            );
+
+        if (result['success'] == true) {
+          // Don't navigate immediately - let the auth state listener handle it
+          // This prevents race conditions with token storage
+        } else {
+          // Show clean error feedback
+          result['error'].showError(context);
+        }
       }
     }
   }
@@ -78,10 +104,14 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     // Navigate to home screen when authenticated
     ref.listen<AuthState>(authProvider, (previous, next) {
-      if (next.user != null) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+      // Navigate if user is authenticated and not loading
+      if (next.user != null && !next.isLoading) {
+        // Navigate immediately since token is already verified in AuthProvider
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        }
       }
     });
 
@@ -238,26 +268,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
                   const SizedBox(height: 16),
 
-                  OutlinedButton.icon(
-                    onPressed:
-                        authState.isLoading
-                            ? null
-                            : () {
-                              // Google sign in logic would go here
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Google Sign In not implemented yet',
-                                  ),
-                                ),
-                              );
-                            },
-                    icon: const Icon(Icons.g_mobiledata),
-                    label: Text(
-                      _isSignUp ? 'Sign up with Google' : 'Sign in with Google',
-                    ),
-                  ),
-
+                  // OutlinedButton.icon(
+                  //   onPressed:
+                  //       authState.isLoading
+                  //           ? null
+                  //           : () {
+                  //             // Google sign in logic would go here
+                  //             ScaffoldMessenger.of(context).showSnackBar(
+                  //               const SnackBar(
+                  //                 content: Text(
+                  //                   'Google Sign In not implemented yet',
+                  //                 ),
+                  //               ),
+                  //             );
+                  //           },
+                  //   icon: const Icon(Icons.g_mobiledata),
+                  //   label: Text(
+                  //     _isSignUp ? 'Sign up with Google' : 'Sign in with Google',
+                  //   ),
+                  // ),
                   const SizedBox(height: 24),
 
                   TextButton(
@@ -298,3 +327,5 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
   }
 }
+
+//  docker exec -it 229eb1ed1107 psql -U postgres -d student_housing

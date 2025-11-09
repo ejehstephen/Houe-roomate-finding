@@ -1,8 +1,10 @@
 import 'package:camp_nest/core/model/user_model.dart';
 import 'package:camp_nest/core/service/auth_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// ------------------------------
+/// 🔹 AUTH STATE
+/// ------------------------------
 class AuthState {
   final UserModel? user;
   final bool isLoading;
@@ -19,52 +21,26 @@ class AuthState {
   }
 }
 
+/// ------------------------------
+/// 🔹 AUTH NOTIFIER
+/// ------------------------------
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
 
   AuthNotifier(this._authService) : super(AuthState()) {
-    _initializeAuth();
+    _loadCurrentUser();
   }
 
-  void _initializeAuth() {
-    // Check if user is already signed in
-    final currentUser = _authService.getCurrentUser();
-    if (currentUser != null) {
-      _loadUserProfile(currentUser.id);
-    }
-
-    // Listen to auth state changes
-    _authService.authStateChanges.listen((authState) {
-      if (authState.event == AuthChangeEvent.signedIn &&
-          authState.session?.user != null) {
-        _loadUserProfile(authState.session!.user.id);
-      } else if (authState.event == AuthChangeEvent.signedOut) {
-        state = AuthState();
-      }
-    });
-  }
-
-  Future<void> _loadUserProfile(String userId) async {
-    try {
-      final user = await _authService.getUserProfile(userId);
-      state = state.copyWith(user: user, isLoading: false);
-    } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
+  /// ✅ Load user from storage if token/session exists
+  Future<void> _loadCurrentUser() async {
+    final user = await _authService.getCurrentUser();
+    if (user != null) {
+      state = state.copyWith(user: user);
     }
   }
 
-  Future<void> signIn(String email, String password) async {
-    state = state.copyWith(isLoading: true, error: null);
-
-    try {
-      final user = await _authService.signIn(email: email, password: password);
-      state = state.copyWith(user: user, isLoading: false);
-    } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
-    }
-  }
-
-  Future<void> signUp({
+  /// ✅ REGISTER user — backend sends OTP
+  Future<Map<String, dynamic>> signUp({
     required String name,
     required String email,
     required String password,
@@ -75,27 +51,141 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final user = await _authService.signUp(
+      final result = await _authService.signUp(
+        name: name,
         email: email,
         password: password,
-        name: name,
         school: school,
         age: age,
         gender: gender,
       );
-      state = state.copyWith(user: user, isLoading: false);
+
+      if (result['success'] == true) {
+        state = state.copyWith(user: result['user'], isLoading: false);
+      } else {
+        state = state.copyWith(error: result['error'], isLoading: false);
+      }
+      return result;
+    } catch (e) {
+      final errorMap = {'success': false, 'error': e.toString()};
+      state = state.copyWith(error: e.toString(), isLoading: false);
+      return errorMap;
+    }
+  }
+
+  /// ✅ LOGIN — only works after verification
+  Future<Map<String, dynamic>> signIn(String email, String password) async {
+    print('🔥 DEBUG AuthProvider: Starting signIn for $email');
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final result = await _authService.signIn(
+        email: email,
+        password: password,
+      );
+
+      print('🔥 DEBUG AuthProvider: Auth service result: ${result['success']}');
+      if (result['user'] != null) {
+        print('🔥 DEBUG AuthProvider: User received: ${result['user'].name}');
+      }
+
+      if (result['success'] == true) {
+        state = state.copyWith(user: result['user'], isLoading: false);
+
+        // Force refresh to get the most up-to-date profile image and data
+        await refreshUser();
+      } else {
+        state = state.copyWith(error: result['error'], isLoading: false);
+      }
+      return result;
+    } catch (e) {
+      print('❌ DEBUG AuthProvider: Exception during signIn: $e');
+      final errorMap = {'success': false, 'error': e.toString()};
+      state = state.copyWith(error: e.toString(), isLoading: false);
+      return errorMap;
+    }
+  }
+
+  /// ✅ VERIFY OTP
+  Future<bool> verifyOtp(String userId, String code) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final success = await _authService.verifyOtp(userId, code);
+      state = state.copyWith(isLoading: false);
+      return success;
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+      return false;
+    }
+  }
+
+  /// 🔁 RESEND OTP
+  Future<bool> resendOtp(String userId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final success = await _authService.resendOtp(userId);
+      state = state.copyWith(isLoading: false);
+      return success;
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+      return false;
+    }
+  }
+
+  /// ✅ UPDATE USER PROFILE
+  Future<void> updateUserProfile(UserModel user) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final result = await _authService.updateUserProfile(user);
+      if (result['success'] == true) {
+        state = state.copyWith(user: result['user'], isLoading: false);
+      } else {
+        state = state.copyWith(error: result['error'], isLoading: false);
+      }
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
 
+  /// ✅ LOGOUT
   Future<void> signOut() async {
     await _authService.signOut();
     state = AuthState();
   }
+
+  /// 🧩 Setters for local changes
+  void setUser(UserModel user) {
+    state = state.copyWith(user: user);
+  }
+
+  Future<void> setProfileImage(String imageUrl) async {
+    final updated = await _authService.setProfileImage(imageUrl);
+    if (updated != null) {
+      state = state.copyWith(user: updated);
+    }
+  }
+
+  /// Force refresh the current user state with fresh profile image
+  Future<void> refreshUser() async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final user = await _authService.refreshCurrentUser();
+      if (user != null) {
+        state = state.copyWith(user: user, isLoading: false);
+      } else {
+        state = state.copyWith(user: null, isLoading: false);
+      }
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+    }
+  }
 }
 
-// Providers
+/// ------------------------------
+/// 🔹 PROVIDERS
+/// ------------------------------
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {

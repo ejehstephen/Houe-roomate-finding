@@ -52,22 +52,36 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
+      // 1) Load questions from API
       final questions = await _questionnaireService.getQuestions();
+      print('Questionnaire: loaded ${questions.length} questions');
 
-      // Check if user has existing answers
-      final currentUserId = _questionnaireService.client.auth.currentUser?.id;
-      if (currentUserId != null) {
-        final existingAnswers = await _questionnaireService.getUserAnswers(
-          currentUserId,
-        );
-        state = state.copyWith(
-          questions: questions,
-          answers: existingAnswers,
-          isLoading: false,
-        );
-      } else {
-        state = state.copyWith(questions: questions, isLoading: false);
+      // 2) Try to load existing answers and completion status (user inferred from token)
+      Map<String, QuestionnaireAnswer> existingAnswers = {};
+      bool completed = false;
+      try {
+        existingAnswers = await _questionnaireService.getUserAnswers('current');
+        print('Questionnaire: fetched ${existingAnswers.length} existing answers');
+      } catch (e) {
+        print('Questionnaire: getUserAnswers error: $e');
       }
+      try {
+        completed = await _questionnaireService.hasUserCompletedQuestionnaire('current');
+        print('Questionnaire: completion status = $completed');
+      } catch (e) {
+        print('Questionnaire: status error: $e');
+      }
+
+      // 3) Determine current index: first unanswered question
+      final idx = _firstUnansweredIndex(questions, existingAnswers);
+
+      state = state.copyWith(
+        questions: questions,
+        answers: existingAnswers,
+        isCompleted: completed,
+        currentQuestionIndex: idx,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
@@ -101,34 +115,63 @@ class QuestionnaireNotifier extends StateNotifier<QuestionnaireState> {
     }
   }
 
+  int _firstUnansweredIndex(
+    List<QuestionnaireQuestion> questions,
+    Map<String, QuestionnaireAnswer> answers,
+  ) {
+    for (int i = 0; i < questions.length; i++) {
+      final q = questions[i];
+      final a = answers[q.id];
+      if (a == null || a.answers.isEmpty) return i;
+    }
+    return 0;
+  }
+
+  Future<void> refreshFromServer() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final answers = await _questionnaireService.getUserAnswers('current');
+      final completed = await _questionnaireService.hasUserCompletedQuestionnaire('current');
+      final idx = _firstUnansweredIndex(state.questions, answers);
+      state = state.copyWith(
+        answers: answers,
+        isCompleted: completed,
+        currentQuestionIndex: idx,
+        isLoading: false,
+      );
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+    }
+  }
+
   Future<void> _completeQuestionnaire() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Get current user ID from Supabase auth
-      final currentUserId = _questionnaireService.client.auth.currentUser?.id;
-      if (currentUserId == null) {
-        throw Exception('User not authenticated');
-      }
-
-      // Save answers to Supabase using upsert
+      // Save answers to backend
       await _questionnaireService.saveAnswers(state.answers);
 
-      // Calculate matches
-      await _matchingService.calculateMatches(currentUserId);
+      // Optionally trigger match recalculation (backend can infer user from token)
+      try {
+        await _matchingService.calculateMatches('current_user_id');
+      } catch (e) {
+        print('Questionnaire: calculateMatches error (non-fatal): $e');
+      }
 
+      // Refresh status and answers after saving
+      await refreshFromServer();
       state = state.copyWith(isCompleted: true, isLoading: false);
     } catch (e) {
-      // If upsert fails, try individual saves as fallback
+      // Fallback: try individual save
       try {
-        final currentUserId = _questionnaireService.client.auth.currentUser?.id;
-        if (currentUserId != null) {
-          await _questionnaireService.saveAnswersIndividually(state.answers);
-          await _matchingService.calculateMatches(currentUserId);
-          state = state.copyWith(isCompleted: true, isLoading: false);
-        } else {
-          throw Exception('User not authenticated');
+        await _questionnaireService.saveAnswersIndividually(state.answers);
+        try {
+          await _matchingService.calculateMatches('current_user_id');
+        } catch (e) {
+          print('Questionnaire: calculateMatches error after fallback (non-fatal): $e');
         }
+        await refreshFromServer();
+        state = state.copyWith(isCompleted: true, isLoading: false);
       } catch (fallbackError) {
         state = state.copyWith(
           error: 'Failed to save questionnaire: ${fallbackError.toString()}',

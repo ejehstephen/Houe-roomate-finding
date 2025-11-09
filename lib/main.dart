@@ -1,4 +1,3 @@
-import 'package:camp_nest/core/utility/supabase_client.dart';
 import 'package:camp_nest/feature/presentation/screens/splashs_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -10,9 +9,6 @@ void main() async {
 
   // Load the .env file
   await dotenv.load(fileName: ".env");
-
-  // Initialize Supabase
-  await SupabaseConfig.initialize();
 
   runApp(const ProviderScope(child: RoomMatchApp()));
 }

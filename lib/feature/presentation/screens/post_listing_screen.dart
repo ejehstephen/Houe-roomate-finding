@@ -1,3 +1,4 @@
+import 'package:camp_nest/core/extension/error_extension.dart';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/service/image_upload_service.dart';
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Add this import if not present
 
 class PostListingScreen extends ConsumerStatefulWidget {
   const PostListingScreen({super.key});
@@ -21,6 +21,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final _locationController = TextEditingController();
+  final _ownerPhoneController = TextEditingController();
 
   String _selectedGender = 'any';
   final List<String> _selectedAmenities = [];
@@ -32,8 +33,9 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
   final List<String> _availableAmenities = [
     'Kitchen',
-    'Parking',
-    'Study Room',
+    'Toilet',
+    'Light',
+    'Water',
     'Backyard',
   ];
 
@@ -45,14 +47,8 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
   Future<void> _testStorageConnection() async {
     final isConnected = await _imageUploadService.testStorageConnection();
-    print('Storage connection test: $isConnected');
     if (!isConnected) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Warning: Storage connection issue detected'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      'Warning: Storage connection issue detected'.showWarning(context);
     }
   }
 
@@ -63,38 +59,24 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
     _priceController.dispose();
     _locationController.dispose();
     _ruleController.dispose();
+    _ownerPhoneController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImages() async {
+  Future<void> _pickMedia() async {
     try {
-      final List<XFile> images = await _picker.pickMultiImage(
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 80,
-      );
+      final List<XFile> mediaFiles =
+          await _picker.pickMultipleMedia(); // supports both images + videos
 
-      if (images.isNotEmpty) {
-        final limitedImages = images.take(5).toList();
+      if (mediaFiles.isNotEmpty) {
+        final limitedFiles = mediaFiles.take(5).toList();
         setState(() {
           _selectedImages =
-              limitedImages.map((xFile) => File(xFile.path)).toList();
+              limitedFiles.map((xFile) => File(xFile.path)).toList();
         });
-
-        // Verify files exist
-        for (int i = 0; i < _selectedImages.length; i++) {
-          final exists = await _selectedImages[i].exists();
-          print('Image $i exists: $exists, path: ${_selectedImages[i].path}');
-        }
       }
     } catch (e) {
-      print('Pick images error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to pick images: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      e.showError(context, duration: const Duration(seconds: 4));
     }
   }
 
@@ -109,23 +91,12 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
       if (image != null && _selectedImages.length < 5) {
         final file = File(image.path);
-        final exists = await file.exists();
-        print('Camera image exists: $exists, path: ${file.path}');
-
-        if (exists) {
-          setState(() {
-            _selectedImages.add(file);
-          });
-        }
+        setState(() {
+          _selectedImages.add(file);
+        });
       }
     } catch (e) {
-      print('Take picture error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to take picture: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      e.showError(context, duration: const Duration(seconds: 4));
     }
   }
 
@@ -155,7 +126,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () {
                           Navigator.pop(context);
-                          _pickImages();
+                          _pickMedia();
                         },
                         icon: const Icon(Icons.photo_library),
                         label: const Text('Gallery'),
@@ -210,9 +181,6 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
         // Upload images if any are selected
         if (_selectedImages.isNotEmpty) {
           print('Starting image upload for  ${_selectedImages.length} images');
-          print(
-            'Current Supabase user: ${Supabase.instance.client.auth.currentUser}',
-          );
           imageUrls = await _imageUploadService.uploadMultipleImages(
             _selectedImages,
             'listings',
@@ -221,12 +189,6 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
           for (var url in imageUrls) {
             print('Uploaded image public URL: $url');
           }
-        }
-
-        // If no images were uploaded successfully, use placeholder
-        if (imageUrls.isEmpty) {
-          imageUrls = ['/placeholder.svg?height=200&width=300'];
-          print('No images uploaded, using placeholder');
         }
 
         print('Image URLs to be stored in RoomListingModel: $imageUrls');
@@ -240,6 +202,10 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
           images: imageUrls,
           ownerId: 'current_user_id',
           ownerName: 'Current User',
+          ownerPhone:
+              _ownerPhoneController.text.isNotEmpty
+                  ? _ownerPhoneController.text
+                  : null,
           amenities: _selectedAmenities,
           rules: _rules,
           gender: _selectedGender,
@@ -493,7 +459,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                     controller: _priceController,
                     decoration: const InputDecoration(
                       labelText: 'Price per month',
-                      prefixText: '\$',
+                      prefixText: '\N',
                     ),
                     keyboardType: TextInputType.number,
                     validator: (value) {
@@ -524,6 +490,18 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                   ),
                 ),
               ],
+            ),
+
+            const SizedBox(height: 16),
+
+            // Owner phone
+            TextFormField(
+              controller: _ownerPhoneController,
+              decoration: const InputDecoration(
+                labelText: 'whatsapp phone ',
+                hintText: '+234',
+              ),
+              keyboardType: TextInputType.phone,
             ),
 
             const SizedBox(height: 24),

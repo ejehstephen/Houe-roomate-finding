@@ -1,4 +1,5 @@
 import 'package:camp_nest/feature/presentation/provider/matches_provider.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:camp_nest/feature/presentation/widget/roomatc_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +25,7 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final matchesState = ref.watch(matchesProvider);
+    final currentUser = ref.watch(authProvider).user;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Your Matches'), centerTitle: true),
@@ -90,7 +92,7 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
                           ),
                           SizedBox(height: 16),
                           Text('No matches found yet'),
-                          Text('Complete the questionnaire to find matches'),
+                          // Text('Complete the questionnaire to find matches'),
                         ],
                       ),
                     )
@@ -101,17 +103,34 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
                         final match = matchesState.matches[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: RoommateCard(
-                            match: match,
-                            onChatPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => ChatScreen(
-                                        roommateId: match.id,
-                                        roommateName: match.name,
-                                      ),
-                                ),
+                          child: Builder(
+                            builder: (context) {
+                              // Debug: Log profile image usage
+                              final matchImageUrl = match.profileImage;
+                              final currentUserImageUrl =
+                                  currentUser?.profileImage;
+                              print(
+                                '🖼️ DEBUG: Match ${match.name} profileImage: ${matchImageUrl.isNotEmpty ? (matchImageUrl.length > 50 ? '${matchImageUrl.substring(0, 50)}...' : matchImageUrl) : 'empty'}',
+                              );
+                              print(
+                                '👤 DEBUG: Current user profileImage: ${currentUserImageUrl != null ? (currentUserImageUrl.length > 50 ? '${currentUserImageUrl.substring(0, 50)}...' : currentUserImageUrl) : 'null'}',
+                              );
+
+                              return RoommateCard(
+                                match: match,
+                                avatarOverrideUrl:
+                                    null, // Don't override - let each match use their own profile image
+                                onChatPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => ChatScreen(
+                                            roommateId: match.id,
+                                            roommateName: match.name,
+                                          ),
+                                    ),
+                                  );
+                                },
                               );
                             },
                           ),

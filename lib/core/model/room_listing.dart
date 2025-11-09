@@ -7,6 +7,8 @@ class RoomListingModel {
   final List<String> images;
   final String ownerId;
   final String ownerName;
+  final String? ownerPhone;
+  final String? whatsappLink;
   final List<String> amenities;
   final List<String> rules;
   final String gender; // 'male', 'female', 'any'
@@ -22,6 +24,8 @@ class RoomListingModel {
     required this.images,
     required this.ownerId,
     required this.ownerName,
+    this.ownerPhone,
+    this.whatsappLink,
     required this.amenities,
     required this.rules,
     required this.gender,
@@ -37,13 +41,28 @@ class RoomListingModel {
       price: (json['price'] as num).toDouble(),
       location: json['location'],
       images: List<String>.from(json['images'] ?? []),
-      ownerId: json['owner_id'],
-      ownerName: json['ownerName'] ?? json['owner_name'] ?? 'Unknown',
+      ownerId: json['owner_id'] ?? json['ownerId'] ?? '',
+      ownerName:
+          json['ownerName'] ??
+          json['owner_name'] ??
+          json['ownerName'] ??
+          'Unknown',
+      ownerPhone:
+          (json['ownerPhone'] ?? json['owner_phone']) is String
+              ? (json['ownerPhone'] ?? json['owner_phone']) as String
+              : null,
+      whatsappLink:
+          (json['whatsappLink'] ?? json['whatsapp_link']) is String
+              ? (json['whatsappLink'] ?? json['whatsapp_link']) as String
+              : null,
       amenities: List<String>.from(json['amenities'] ?? []),
       rules: List<String>.from(json['rules'] ?? []),
       gender: json['gender_preference'] ?? 'any',
-      availableFrom: DateTime.parse(json['available_from']),
-      isActive: json['is_active'] ?? true,
+      availableFrom:
+          json['available_from'] != null
+              ? DateTime.parse(json['available_from'])
+              : DateTime.now(),
+      isActive: json['is_active'] ?? json['isActive'] ?? true,
     );
   }
 
@@ -57,6 +76,8 @@ class RoomListingModel {
       'images': images,
       'owner_id': ownerId,
       'owner_name': ownerName,
+      'ownerPhone': ownerPhone,
+      'whatsappLink': whatsappLink,
       'amenities': amenities,
       'rules': rules,
       'gender_preference': gender,

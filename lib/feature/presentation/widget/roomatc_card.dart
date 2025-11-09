@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class RoommateCard extends StatelessWidget {
   final RoommateMatchModel match;
   final VoidCallback onChatPressed;
+  final String? avatarOverrideUrl;
 
   const RoommateCard({
     super.key,
     required this.match,
     required this.onChatPressed,
+    this.avatarOverrideUrl,
   });
 
   @override
@@ -23,7 +25,9 @@ class RoommateCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 30,
-                  backgroundImage: NetworkImage(match.profileImage),
+                  backgroundColor: Colors.transparent,
+                  backgroundImage: _resolveAvatarImage(),
+                  child: _resolveAvatarChild(),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -171,6 +175,27 @@ class RoommateCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  ImageProvider<Object>? _resolveAvatarImage() {
+    final url = (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty)
+        ? avatarOverrideUrl!
+        : match.profileImage;
+    if (url.trim().isEmpty) return null;
+    // Normalize relative URLs if your backend returns paths
+    if (url.startsWith('/')) {
+      // Fallback to a relative path; app should prefix with base if needed at fetch time
+      return NetworkImage(url);
+    }
+    return NetworkImage(url);
+  }
+
+  Widget? _resolveAvatarChild() {
+    final hasImage = (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty) ||
+        match.profileImage.trim().isNotEmpty;
+    if (hasImage) return null;
+    final initial = match.name.isNotEmpty ? match.name.substring(0, 1).toUpperCase() : 'U';
+    return Text(initial, style: const TextStyle(fontSize: 18));
   }
 
   Color _getCompatibilityColor(int score) {
