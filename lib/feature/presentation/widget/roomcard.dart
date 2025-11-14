@@ -3,8 +3,11 @@
 import 'package:camp_nest/feature/presentation/widget/Media.dart';
 // import 'package:flutter_svg/flutter_svg.dart';
 import 'package:camp_nest/core/model/room_listing.dart';
+import 'package:camp_nest/core/model/user_model.dart';
 import 'package:camp_nest/feature/presentation/screens/roomate_detailed.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'dart:io';
 // import 'package:video_player/video_player.dart';
 // import 'package:chewie/chewie.dart';
@@ -110,15 +113,7 @@ class _RoomCardState extends State<RoomCard> {
 
                       const SizedBox(height: 10),
 
-                      // // Owner
-                      // Text(
-                      //   'by ${listing.ownerName}',
-                      //   style: TextStyle(color: Colors.grey[500], fontSize: 10),
-                      //   maxLines: 1,
-                      //   overflow: TextOverflow.ellipsis,
-                      // ),
-
-                      // const SizedBox(height: 6),
+                      // Owner Profile Section removed from RoomCard
 
                       // Amenities - Show only top 2 with smaller chips
                       if (widget.listing.amenities.isNotEmpty)
@@ -203,4 +198,6 @@ class _RoomCardState extends State<RoomCard> {
       ),
     );
   }
+
+  // Helper method removed
 }

@@ -1,4 +1,5 @@
 import 'package:camp_nest/core/model/room_listing.dart';
+import 'package:camp_nest/core/model/user_model.dart';
 import 'package:camp_nest/core/theme/app_theme.dart';
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
@@ -21,11 +22,55 @@ class RoomDetailScreen extends ConsumerStatefulWidget {
 class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   int _currentImageIndex = 0;
   final PageController _pageController = PageController();
+  UserModel? _listingOwner;
+  bool _loadingOwner = true;
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadListingOwner();
+    // Initialize a list of controllers, one for each media item
+    _chewieControllers = List.generate(
+      widget.listing.images.length,
+      (index) => null,
+    );
+  }
+
+  Future<void> _loadListingOwner() async {
+    try {
+      // Fetch the listing owner's profile using their ID
+      final ownerId = widget.listing.ownerId;
+      if (ownerId.isNotEmpty) {
+        // This would typically call your auth service or user service
+        // For now, we'll use the available owner data from the listing
+        _listingOwner = UserModel(
+          id: widget.listing.ownerId,
+          name: widget.listing.ownerName,
+          email: '', // Not available in listing, could be fetched separately
+          profileImage:
+              '', // Not available in listing, could be fetched separately
+          school: '',
+          age: 0,
+          gender: '',
+          phoneNumber: widget.listing.ownerPhone,
+          preferences: [],
+        );
+      }
+    } catch (e) {
+      print('Error loading listing owner: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingOwner = false;
+        });
+      }
+    }
   }
 
   Future<void> _contactViaWhatsApp() async {
@@ -145,15 +190,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   // Create a list of controllers to manage them
   List<ChewieController?> _chewieControllers = [];
 
-  @override
-  void initState() {
-    super.initState();
-    // Initialize a list of controllers, one for each media item
-    _chewieControllers = List.generate(
-      widget.listing.images.length,
-      (index) => null,
-    );
-  }
+  // initState method merged above
 
   void _handlePageChanged(int index) {
     // Pause the video that was just scrolled away
@@ -383,6 +420,95 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+
+                  // Listing Owner Profile Section
+                  if (_loadingOwner)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                    )
+                  else if (_listingOwner != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 20,
+                            backgroundColor: const Color(0xFF5E60CE),
+                            backgroundImage:
+                                _listingOwner!.profileImage != null &&
+                                        _listingOwner!.profileImage!.isNotEmpty
+                                    ? NetworkImage(_listingOwner!.profileImage!)
+                                    : null,
+                            child:
+                                _listingOwner!.profileImage == null ||
+                                        _listingOwner!.profileImage!.isEmpty
+                                    ? Text(
+                                      _getUserInitials(_listingOwner!.name),
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _listingOwner!.name,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'Listing Owner',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Owner',
+                              style: const TextStyle(
+                                color: Color(0xFF5E60CE),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    const SizedBox.shrink(),
 
                   // const SizedBox(height: 8),
 
@@ -631,6 +757,20 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         return Icons.grass;
       default:
         return Icons.check_circle;
+    }
+  }
+
+  /// Helper method to extract initials from user name
+  String _getUserInitials(String name) {
+    if (name.isEmpty) return 'U';
+
+    final parts = name.split(' ').where((p) => p.isNotEmpty).toList();
+
+    if (parts.length == 1) {
+      return parts[0].substring(0, 1).toUpperCase();
+    } else {
+      return (parts[0].substring(0, 1) + parts[1].substring(0, 1))
+          .toUpperCase();
     }
   }
 }

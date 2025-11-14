@@ -1,7 +1,10 @@
 import 'package:camp_nest/core/model/roomate_matching.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-class RoommateCard extends StatelessWidget {
+class RoommateCard extends ConsumerWidget {
   final RoommateMatchModel match;
   final VoidCallback onChatPressed;
   final String? avatarOverrideUrl;
@@ -14,7 +17,7 @@ class RoommateCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -24,7 +27,7 @@ class RoommateCard extends StatelessWidget {
             Row(
               children: [
                 CircleAvatar(
-                  radius: 30,
+                  radius: 50,
                   backgroundColor: Colors.transparent,
                   backgroundImage: _resolveAvatarImage(),
                   child: _resolveAvatarChild(),
@@ -162,13 +165,20 @@ class RoommateCard extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // Chat button
+            // WhatsApp contact button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: onChatPressed,
-                icon: const Icon(Icons.chat_bubble_outline),
-                label: const Text('Start Chat'),
+                onPressed: () async {
+                  await _contactViaWhatsApp(context, ref);
+                },
+                icon: const Icon(Icons.chat, color: Colors.white, size: 16),
+                label: const Text('Contact via WhatsApp'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
               ),
             ),
           ],
@@ -178,9 +188,10 @@ class RoommateCard extends StatelessWidget {
   }
 
   ImageProvider<Object>? _resolveAvatarImage() {
-    final url = (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty)
-        ? avatarOverrideUrl!
-        : match.profileImage;
+    final url =
+        (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty)
+            ? avatarOverrideUrl!
+            : match.profileImage;
     if (url.trim().isEmpty) return null;
     // Normalize relative URLs if your backend returns paths
     if (url.startsWith('/')) {
@@ -191,10 +202,12 @@ class RoommateCard extends StatelessWidget {
   }
 
   Widget? _resolveAvatarChild() {
-    final hasImage = (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty) ||
+    final hasImage =
+        (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty) ||
         match.profileImage.trim().isNotEmpty;
     if (hasImage) return null;
-    final initial = match.name.isNotEmpty ? match.name.substring(0, 1).toUpperCase() : 'U';
+    final initial =
+        match.name.isNotEmpty ? match.name.substring(0, 1).toUpperCase() : 'U';
     return Text(initial, style: const TextStyle(fontSize: 18));
   }
 
@@ -231,6 +244,65 @@ class RoommateCard extends StatelessWidget {
         return 'Smoking';
       default:
         return key;
+    }
+  }
+
+  Future<void> _contactViaWhatsApp(BuildContext context, WidgetRef ref) async {
+    if (match.phoneNumber == null || match.phoneNumber!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This user hasn\'t added a phone number yet'),
+        ),
+      );
+      return;
+    }
+
+    // Sanitize and normalize matched user's phone number
+    String phoneNumber = match.phoneNumber!;
+
+    // Add +234 prefix if not present
+    if (!phoneNumber.startsWith('+234') && !phoneNumber.startsWith('234')) {
+      if (phoneNumber.startsWith('0')) {
+        phoneNumber = '+234${phoneNumber.substring(1)}';
+      } else {
+        phoneNumber = '+234$phoneNumber';
+      }
+    }
+
+    // Sanitize phone number
+    final sanitizedPhone = phoneNumber.replaceAll(RegExp(r'[\s\-()]+'), '');
+    final normalizedPhone =
+        sanitizedPhone.startsWith('+')
+            ? sanitizedPhone.substring(1)
+            : sanitizedPhone;
+
+    // Create WhatsApp URL
+    final whatsappUrl =
+        'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent('Hi ${match.name}! I found you through CampNest and would like to discuss potential roommate arrangements.')}';
+
+    // Launch WhatsApp
+    try {
+      final uri = Uri.parse(whatsappUrl);
+      final canLaunch = await canLaunchUrl(uri);
+      if (canLaunch) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Unable to open WhatsApp. Please make sure WhatsApp is installed.',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Unable to open WhatsApp. Please make sure WhatsApp is installed.',
+          ),
+        ),
+      );
     }
   }
 }

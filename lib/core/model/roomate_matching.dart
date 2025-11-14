@@ -9,6 +9,23 @@ class RoommateMatchModel {
   final int compatibilityScore;
   final List<String> commonInterests;
   final Map<String, String> preferences;
+  final String? phoneNumber;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'profileImage': profileImage,
+      'age': age,
+      'school': school,
+      'gender': gender,
+      'budget': budget,
+      'compatibilityScore': compatibilityScore,
+      'commonInterests': commonInterests,
+      'preferences': preferences,
+      'phoneNumber': phoneNumber,
+    };
+  }
 
   RoommateMatchModel({
     required this.id,
@@ -21,6 +38,7 @@ class RoommateMatchModel {
     required this.compatibilityScore,
     required this.commonInterests,
     required this.preferences,
+    this.phoneNumber,
   });
 
   factory RoommateMatchModel.fromJson(Map<String, dynamic> json) {
@@ -57,6 +75,7 @@ class RoommateMatchModel {
                 ),
               )
               : <String, String>{},
+      phoneNumber: json['phoneNumber'] ?? json['phone_number'],
     );
   }
 }

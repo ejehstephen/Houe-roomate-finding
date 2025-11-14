@@ -36,24 +36,47 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                const Icon(Icons.favorite, size: 48, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(
-                  'Great news!',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                if (matchesState.matches.isEmpty) ...[
+                  Icon(
+                    Icons.favorite_border,
+                    size: 48,
+                    color: Colors.grey[400],
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  matchesState.isLoading
-                      ? 'Finding your matches...'
-                      : 'We found ${matchesState.matches.length} compatible roommates for you',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No matches yet',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Sorry not matching yet, check back later or will notify u when there is one',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ] else ...[
+                  const Icon(Icons.favorite, size: 48, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Great news!',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    matchesState.isLoading
+                        ? 'Finding your matches...'
+                        : 'We found ${matchesState.matches.length} compatible roommates for you',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
             ),
           ),
@@ -62,7 +85,7 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
           Expanded(
             child:
                 matchesState.isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Center(child: CircularProgressIndicator())
                     : matchesState.error != null
                     ? Center(
                       child: Column(
@@ -81,19 +104,37 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
                       ),
                     )
                     : matchesState.matches.isEmpty
-                    ? const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.people_outline,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text('No matches found yet'),
-                          // Text('Complete the questionnaire to find matches'),
-                        ],
+                    ? Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.favorite_border,
+                              size: 80,
+                              color: Colors.grey[400],
+                            ),
+                            SizedBox(height: 24),
+                            Text(
+                              'No matches found yet',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Sorry not matching yet, check back later or will notify u when there is one',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
                       ),
                     )
                     : ListView.builder(

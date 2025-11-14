@@ -1,4 +1,5 @@
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/service/listing_service.dart';
 import 'package:camp_nest/feature/presentation/screens/post_listing_screen.dart';

@@ -24,6 +24,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _ageController;
   late final TextEditingController _phoneController;
   String _gender = '';
+  bool _isUploading = false;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
@@ -78,49 +79,71 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.photo_camera_outlined),
-                          label: const Text('Update Photo'),
-                          onPressed: () async {
-                            final picker = ImagePicker();
-                            final picked = await picker.pickImage(
-                              source: ImageSource.gallery,
-                              imageQuality: 85,
-                            );
-                            if (picked == null) return;
+                          icon:
+                              _isUploading
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Icon(Icons.photo_camera_outlined),
+                          label: Text(
+                            _isUploading ? 'Uploading...' : 'Update Photo',
+                          ),
+                          onPressed:
+                              _isUploading
+                                  ? null
+                                  : () async {
+                                    final picker = ImagePicker();
+                                    final picked = await picker.pickImage(
+                                      source: ImageSource.gallery,
+                                      imageQuality: 85,
+                                    );
+                                    if (picked == null) return;
 
-                            final file = File(picked.path);
-                            final uploadSvc = ImageUploadService();
-                            try {
-                              final url = await uploadSvc.uploadImage(
-                                file,
-                                'profiles',
-                              );
+                                    setState(() => _isUploading = true);
 
-                              // Update the provider state immediately for UI refresh
-                              final currentUser = ref.read(authProvider).user;
-                              if (currentUser != null) {
-                                final updatedUser = currentUser.copyWith(
-                                  profileImage: url,
-                                );
-                                ref
-                                    .read(authProvider.notifier)
-                                    .setUser(updatedUser);
-                              }
+                                    final file = File(picked.path);
+                                    final uploadSvc = ImageUploadService();
 
-                              // Also persist to backend
-                              await ref
-                                  .read(authProvider.notifier)
-                                  .setProfileImage(url);
+                                    try {
+                                      final url = await uploadSvc.uploadImage(
+                                        file,
+                                        'profiles',
+                                      );
 
-                              'Profile photo updated successfully'.showSuccess(
-                                context,
-                              );
-                            } catch (e) {
-                              e.showError(context);
-                            }
-                          },
+                                      // Update provider state immediately for UI refresh
+                                      final currentUser =
+                                          ref.read(authProvider).user;
+                                      if (currentUser != null) {
+                                        final updatedUser = currentUser
+                                            .copyWith(profileImage: url);
+                                        ref
+                                            .read(authProvider.notifier)
+                                            .setUser(updatedUser);
+                                      }
+
+                                      // Persist to backend
+                                      final updatedUser =
+                                          ref.read(authProvider).user!;
+                                      await ref
+                                          .read(authProvider.notifier)
+                                          .updateUserProfile(updatedUser);
+
+                                      'Profile photo updated successfully'
+                                          .showSuccess(context);
+                                    } catch (e) {
+                                      e.showError(context);
+                                    } finally {
+                                      if (mounted)
+                                        setState(() => _isUploading = false);
+                                    }
+                                  },
                         ),
                       ),
+
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _nameController,
@@ -235,29 +258,32 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final updatedUser = UserModel(
-      id: widget.user.id,
+    // Get current user from provider (this has latest profileImage if updated)
+    final currentUser = ref.read(authProvider).user;
+
+    if (currentUser == null) return;
+
+    final updatedUser = currentUser.copyWith(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       school: _schoolController.text.trim(),
-      age: int.tryParse(_ageController.text.trim()) ?? widget.user.age,
-      gender: _gender.isEmpty ? widget.user.gender : _gender,
+      age: int.tryParse(_ageController.text.trim()) ?? currentUser.age,
+      gender: _gender.isEmpty ? currentUser.gender : _gender,
       phoneNumber:
           _phoneController.text.trim().isEmpty
               ? null
               : _phoneController.text.trim(),
-      profileImage: widget.user.profileImage,
-      preferences: widget.user.preferences,
+      // profileImage is already updated in provider when user uploads
     );
 
     try {
-      // Update provider state immediately for instant UI feedback
+      // Update provider state immediately for UI
       ref.read(authProvider.notifier).setUser(updatedUser);
 
       // Persist to backend
       await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
 
-      // Return the updated user to the previous screen
+      // Return the updated user to previous screen
       if (mounted) {
         Navigator.pop(context, updatedUser);
       }
