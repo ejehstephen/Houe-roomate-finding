@@ -1,14 +1,12 @@
 import 'package:camp_nest/feature/presentation/screens/splashs_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Load the .env file
-  await dotenv.load(fileName: ".env");
+  // .env loading removed; using hardcoded AppConfig for configuration.
 
   runApp(const ProviderScope(child: RoomMatchApp()));
 }

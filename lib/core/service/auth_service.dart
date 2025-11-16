@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:camp_nest/core/model/user_model.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:camp_nest/core/extension/config.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
@@ -10,7 +10,7 @@ class AuthService {
   static const String _tokenKey = 'auth_token';
   static const String _userKey = 'user_data';
 
-  String get _baseUrl => dotenv.env['API_BASE_URL'] ?? 'http://localhost:8080';
+  String get _baseUrl => AppConfig.apiBaseUrl;
   String get baseUrl => _baseUrl;
 
   // Helper to safely truncate strings for logging
@@ -182,7 +182,7 @@ class AuthService {
     required String password,
   }) async {
     print('🔐 DEBUG: Starting signIn process for email: $email');
-    print('🌐 DEBUG: API_BASE_URL from env: ${dotenv.env['API_BASE_URL']}');
+    print('🌐 DEBUG: API_BASE_URL (AppConfig): ${AppConfig.apiBaseUrl}');
     print('🌐 DEBUG: Using base URL: $_baseUrl');
 
     final loginUrl = '$_baseUrl/auth/login';
@@ -587,7 +587,7 @@ class AuthService {
   /// Debug method to verify environment configuration
   Future<void> debugEnvironmentConfig() async {
     print('🔍 DEBUG: Environment Configuration Check');
-    print('🔍 DEBUG: API_BASE_URL from dotenv: ${dotenv.env['API_BASE_URL']}');
+    print('🔍 DEBUG: API_BASE_URL (AppConfig): ${AppConfig.apiBaseUrl}');
     print('🔍 DEBUG: Computed base URL: $_baseUrl');
 
     // Check if using ngrok and try IP resolution
