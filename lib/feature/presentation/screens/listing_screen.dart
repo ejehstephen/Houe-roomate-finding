@@ -39,9 +39,23 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
 
     return Scaffold(
       // appBar: AppBar(leading: BackButton()),
-      body: CustomScrollView(
-        scrollDirection: Axis.vertical,
-        slivers: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final isTablet = w >= 600 && w < 1024;
+          final isDesktop = w >= 1024;
+          final horizontalPadding = isDesktop ? 24.0 : isTablet ? 20.0 : 16.0;
+          const maxContentWidth = 1200.0;
+
+          return SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: maxContentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                  child: CustomScrollView(
+                    scrollDirection: Axis.vertical,
+                    slivers: [
           // App Bar
           SliverAppBar(
             // leading: BackButton(),
@@ -139,6 +153,12 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
           // Bottom padding for FAB
           const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
         ],
+      ),
+                ),
+              ),
+            ),
+          );
+        },
       ),
 
       // Floating Action Button for post creation

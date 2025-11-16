@@ -172,158 +172,181 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
       ),
       // backgroundColor: AppTheme.textPrimary,
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Main action buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ActionCard(
-                          title: 'Find a Room',
-                          subtitle: 'Browse available rooms',
-                          icon: Icons.home_outlined,
-                          color: Theme.of(context).colorScheme.tertiary,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => const ListingsScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _ActionCard(
-                          title: 'Find Roommate',
-                          subtitle: 'Take compatibility quiz',
-                          icon: Icons.people_outline,
-                          color: Theme.of(context).colorScheme.tertiary,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => const QuestionnaireScreen(),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final isMobile = w < 600;
+          final isTablet = w >= 600 && w < 1024;
+          final isDesktop = w >= 1024;
+
+          final horizontalPadding = isDesktop ? 24.0 : isTablet ? 20.0 : 16.0;
+          const maxContentWidth = 1200.0;
+
+          return SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: maxContentWidth),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
                   ),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.only(top: 16),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Main action buttons
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _ActionCard(
+                                      title: 'Find a Room',
+                                      subtitle: 'Browse available rooms',
+                                      icon: Icons.home_outlined,
+                                      color: Theme.of(context).colorScheme.tertiary,
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => const ListingsScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: _ActionCard(
+                                      title: 'Find Roommate',
+                                      subtitle: 'Take compatibility quiz',
+                                      icon: Icons.people_outline,
+                                      color: Theme.of(context).colorScheme.tertiary,
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (context) => const QuestionnaireScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
 
-                  const SizedBox(height: 32),
+                              const SizedBox(height: 32),
 
-                  // Featured listings header
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Featured Rooms',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => const ListingsScreen(),
-                            ),
-                          );
-                        },
-                        child: const Text('See All'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
-
-          // Featured listings content as a sliver list
-          if (listingsState.isLoading)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (listingsState.error != null &&
-              listingsState.listings.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red),
-                    SizedBox(height: 16),
-                    Text('Error: ${listingsState.error}'),
-                    SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () async {
-                        print('🔄 DEBUG HomeScreen: Retry button pressed');
-                        await _debugTokenStatus();
-                        // Clear error state first, then reload
-                        ref.read(listingsProvider.notifier).clearError();
-                        ref.read(listingsProvider.notifier).loadAllListings();
-                      },
-                      child: const Text('Retry'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        // Force token refresh by signing out and back in
-                        final authService = AuthService();
-                        print('🔄 Clearing stored data...');
-                        await authService.signOut();
-                        // Navigate to auth screen
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                            builder: (context) => const AuthScreen(),
+                              // Featured listings header
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Featured Rooms',
+                                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (context) => const ListingsScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text('See All'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
                           ),
-                          (route) => false,
-                        );
-                      },
-                      child: const Text('Sign In Again'),
-                    ),
-                  ],
+                        ),
+                      ),
+
+                      // Featured listings content as a sliver list
+                      if (listingsState.isLoading)
+                        const SliverFillRemaining(
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (listingsState.error != null &&
+                          listingsState.listings.isEmpty)
+                        SliverFillRemaining(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                                SizedBox(height: 16),
+                                Text('Error: ${listingsState.error}'),
+                                SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    print('🔄 DEBUG HomeScreen: Retry button pressed');
+                                    await _debugTokenStatus();
+                                    // Clear error state first, then reload
+                                    ref.read(listingsProvider.notifier).clearError();
+                                    ref.read(listingsProvider.notifier).loadAllListings();
+                                  },
+                                  child: const Text('Retry'),
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    // Force token refresh by signing out and back in
+                                    final authService = AuthService();
+                                    print('🔄 Clearing stored data...');
+                                    await authService.signOut();
+                                    // Navigate to auth screen
+                                    Navigator.of(context).pushAndRemoveUntil(
+                                      MaterialPageRoute(
+                                        builder: (context) => const AuthScreen(),
+                                      ),
+                                      (route) => false,
+                                    );
+                                  },
+                                  child: const Text('Sign In Again'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (listingsState.listings.isEmpty)
+                        const SliverFillRemaining(
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.home_outlined, size: 64, color: Colors.grey),
+                                SizedBox(height: 16),
+                                Text('No rooms found'),
+                                Text('Try adjusting your filters'),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate((context, index) {
+                              final listing = listingsState.listings[index];
+                              return Container(
+                                width: double.infinity,
+                                height: 400,
+                                margin: const EdgeInsets.only(top: 15),
+                                child: RoomCard(listing: listing),
+                              );
+                            }, childCount: listingsState.listings.length),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            )
-          else if (listingsState.listings.isEmpty)
-            const SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.home_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('No rooms found'),
-                    Text('Try adjusting your filters'),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final listing = listingsState.listings[index];
-                  return Container(
-                    width: double.infinity,
-                    height: 400,
-                    margin: const EdgeInsets.only(top: 15),
-                    child: RoomCard(listing: listing),
-                  );
-                }, childCount: listingsState.listings.length),
               ),
             ),
-        ],
+          );
+        },
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,

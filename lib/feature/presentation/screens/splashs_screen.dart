@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:camp_nest/core/extension/config.dart';
 import 'auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -33,14 +33,11 @@ class _SplashScreenState extends State<SplashScreen>
 
   void _checkEnvironmentConfig() {
     print('🚀 DEBUG SPLASH: Environment check on startup');
-    print('🚀 DEBUG SPLASH: API_BASE_URL = ${dotenv.env['API_BASE_URL']}');
-    print('🚀 DEBUG SPLASH: All env vars: ${dotenv.env}');
+    print('🚀 DEBUG SPLASH: API_BASE_URL (AppConfig) = ${AppConfig.apiBaseUrl}');
 
-    if (dotenv.env['API_BASE_URL']?.isEmpty ?? true) {
-      print('❌ WARNING: API_BASE_URL is not set or empty!');
-    } else if (!dotenv.env['API_BASE_URL']!.contains('onrender.com')) {
+    if (!AppConfig.apiBaseUrl.contains('onrender.com')) {
       print('⚠️ WARNING: API_BASE_URL does not contain onrender.com domain');
-      print('⚠️ Current value: ${dotenv.env['API_BASE_URL']}');
+      print('⚠️ Current value: ${AppConfig.apiBaseUrl}');
     } else {
       print('✅ API_BASE_URL correctly configured for Render');
     }

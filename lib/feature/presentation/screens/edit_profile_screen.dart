@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:camp_nest/core/extension/error_extension.dart';
 import 'package:camp_nest/core/model/user_model.dart';
 
@@ -7,6 +9,7 @@ import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart' as fp;
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   final UserModel user;
@@ -96,49 +99,54 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                               _isUploading
                                   ? null
                                   : () async {
-                                    final picker = ImagePicker();
-                                    final picked = await picker.pickImage(
-                                      source: ImageSource.gallery,
-                                      imageQuality: 85,
-                                    );
-                                    if (picked == null) return;
-
                                     setState(() => _isUploading = true);
-
-                                    final file = File(picked.path);
                                     final uploadSvc = ImageUploadService();
-
                                     try {
-                                      final url = await uploadSvc.uploadImage(
-                                        file,
-                                        'profiles',
-                                      );
+                                      String url;
+                                      if (kIsWeb) {
+                                        final res = await fp.FilePicker.platform.pickFiles(
+                                          allowMultiple: false,
+                                          withData: true,
+                                          type: fp.FileType.custom,
+                                          allowedExtensions: ['jpg','jpeg','png','webp'],
+                                        );
+                                        if (res == null || res.files.isEmpty || res.files.first.bytes == null) {
+                                          setState(() => _isUploading = false);
+                                          return;
+                                        }
+                                        final bytes = res.files.first.bytes!;
+                                        final filename = res.files.first.name;
+                                        url = await uploadSvc.uploadImageBytes(bytes, filename, 'profiles');
+                                      } else {
+                                        final picker = ImagePicker();
+                                        final picked = await picker.pickImage(
+                                          source: ImageSource.gallery,
+                                          imageQuality: 85,
+                                        );
+                                        if (picked == null) {
+                                          setState(() => _isUploading = false);
+                                          return;
+                                        }
+                                        final file = File(picked.path);
+                                        url = await uploadSvc.uploadImage(file, 'profiles');
+                                      }
 
                                       // Update provider state immediately for UI refresh
-                                      final currentUser =
-                                          ref.read(authProvider).user;
+                                      final currentUser = ref.read(authProvider).user;
                                       if (currentUser != null) {
-                                        final updatedUser = currentUser
-                                            .copyWith(profileImage: url);
-                                        ref
-                                            .read(authProvider.notifier)
-                                            .setUser(updatedUser);
+                                        final updatedUser = currentUser.copyWith(profileImage: url);
+                                        ref.read(authProvider.notifier).setUser(updatedUser);
                                       }
 
                                       // Persist to backend
-                                      final updatedUser =
-                                          ref.read(authProvider).user!;
-                                      await ref
-                                          .read(authProvider.notifier)
-                                          .updateUserProfile(updatedUser);
+                                      final updatedUser = ref.read(authProvider).user!;
+                                      await ref.read(authProvider.notifier).updateUserProfile(updatedUser);
 
-                                      'Profile photo updated successfully'
-                                          .showSuccess(context);
+                                      'Profile photo updated successfully'.showSuccess(context);
                                     } catch (e) {
                                       e.showError(context);
                                     } finally {
-                                      if (mounted)
-                                        setState(() => _isUploading = false);
+                                      if (mounted) setState(() => _isUploading = false);
                                     }
                                   },
                         ),

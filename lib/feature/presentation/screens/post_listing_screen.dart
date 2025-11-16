@@ -5,7 +5,10 @@ import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart' as fp;
 
 class PostListingScreen extends ConsumerStatefulWidget {
   const PostListingScreen({super.key});
@@ -27,6 +30,9 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
   final List<String> _selectedAmenities = [];
   final List<String> _rules = [];
   List<File> _selectedImages = [];
+  // For web: hold picked bytes/filenames
+  List<Uint8List> _selectedImageBytes = [];
+  List<String> _selectedFilenames = [];
   final _ruleController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   final ImageUploadService _imageUploadService = ImageUploadService();
@@ -65,15 +71,33 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
   Future<void> _pickMedia() async {
     try {
-      final List<XFile> mediaFiles =
-          await _picker.pickMultipleMedia(); // supports both images + videos
-
-      if (mediaFiles.isNotEmpty) {
-        final limitedFiles = mediaFiles.take(5).toList();
-        setState(() {
-          _selectedImages =
-              limitedFiles.map((xFile) => File(xFile.path)).toList();
-        });
+      if (kIsWeb) {
+        // Use file_picker for web
+        final res = await fp.FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          withData: true, // get bytes
+          type: fp.FileType.custom,
+          allowedExtensions: ['jpg','jpeg','png','webp'],
+        );
+        if (res != null && res.files.isNotEmpty) {
+          final files = res.files.take(5).toList();
+          setState(() {
+            _selectedImageBytes = files.where((f) => f.bytes != null).map((f) => f.bytes!).toList();
+            _selectedFilenames = files.map((f) => f.name).toList();
+            _selectedImages.clear(); // clear mobile list
+          });
+        }
+      } else {
+        // Mobile/desktop via image_picker
+        final List<XFile> mediaFiles = await _picker.pickMultipleMedia();
+        if (mediaFiles.isNotEmpty) {
+          final limitedFiles = mediaFiles.take(5).toList();
+          setState(() {
+            _selectedImages = limitedFiles.map((xFile) => File(xFile.path)).toList();
+            _selectedImageBytes.clear();
+            _selectedFilenames.clear();
+          });
+        }
       }
     } catch (e) {
       e.showError(context, duration: const Duration(seconds: 4));
@@ -81,6 +105,11 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
   }
 
   Future<void> _takePicture() async {
+    if (kIsWeb) {
+      // Camera access via image_picker is limited on web; fall back to file picker
+      await _pickMedia();
+      return;
+    }
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
@@ -102,7 +131,12 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
   void _removeImage(int index) {
     setState(() {
-      _selectedImages.removeAt(index);
+      if (kIsWeb) {
+        _selectedImageBytes.removeAt(index);
+        _selectedFilenames.removeAt(index);
+      } else {
+        _selectedImages.removeAt(index);
+      }
     });
   }
 
@@ -179,7 +213,18 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
         List<String> imageUrls = [];
 
         // Upload images if any are selected
-        if (_selectedImages.isNotEmpty) {
+        if (kIsWeb && _selectedImageBytes.isNotEmpty) {
+          print('Starting web image upload for ${_selectedImageBytes.length} images');
+          imageUrls = await _imageUploadService.uploadMultipleBytes(
+            _selectedImageBytes,
+            _selectedFilenames,
+            'listings',
+          );
+          print('Upload completed. URLs: $imageUrls');
+          for (var url in imageUrls) {
+            print('Uploaded image public URL: $url');
+          }
+        } else if (_selectedImages.isNotEmpty) {
           print('Starting image upload for  ${_selectedImages.length} images');
           imageUrls = await _imageUploadService.uploadMultipleImages(
             _selectedImages,
@@ -272,7 +317,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                   border: Border.all(color: Colors.grey[300]!),
                 ),
                 child:
-                    _selectedImages.isEmpty
+                    (!kIsWeb && _selectedImages.isEmpty) || (kIsWeb && _selectedImageBytes.isEmpty)
                         ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -299,24 +344,31 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: Image.file(
-                                _selectedImages.first,
-                                width: double.infinity,
-                                height: 200,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  print('Image display error: $error');
-                                  return Container(
-                                    color: Colors.grey[400],
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.error,
-                                        color: Colors.red,
-                                      ),
+                              child: kIsWeb
+                                  ? Image.memory(
+                                      _selectedImageBytes.first,
+                                      width: double.infinity,
+                                      height: 200,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Image.file(
+                                      _selectedImages.first,
+                                      width: double.infinity,
+                                      height: 200,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        print('Image display error: $error');
+                                        return Container(
+                                          color: Colors.grey[400],
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.error,
+                                              color: Colors.red,
+                                            ),
+                                          ),
+                                        );
+                                      },
                                     ),
-                                  );
-                                },
-                              ),
                             ),
                             Positioned(
                               bottom: 8,
@@ -331,7 +383,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  '${_selectedImages.length} image${_selectedImages.length > 1 ? 's' : ''}',
+                                  '${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length)} image${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length) > 1 ? 's' : ''}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -360,13 +412,13 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
             ),
 
             // Show selected images
-            if (_selectedImages.isNotEmpty) ...[
+            if ((!kIsWeb && _selectedImages.isNotEmpty) || (kIsWeb && _selectedImageBytes.isNotEmpty)) ...[
               const SizedBox(height: 16),
               SizedBox(
                 height: 80,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: _selectedImages.length,
+                  itemCount: kIsWeb ? _selectedImageBytes.length : _selectedImages.length,
                   itemBuilder: (context, index) {
                     return Container(
                       width: 80,
@@ -375,21 +427,28 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              _selectedImages[index],
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey[400],
-                                  child: const Icon(
-                                    Icons.error,
-                                    color: Colors.red,
+                            child: kIsWeb
+                                ? Image.memory(
+                                    _selectedImageBytes[index],
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    _selectedImages[index],
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[400],
+                                        child: const Icon(
+                                          Icons.error,
+                                          color: Colors.red,
+                                        ),
+                                      );
+                                    },
                                   ),
-                                );
-                              },
-                            ),
                           ),
                           Positioned(
                             top: 4,
