@@ -74,21 +74,17 @@ class UserModel {
     );
   }
 
-  // ✅ JSON serializer
+  // ✅ JSON serializer (Strictly matches DB Schema)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'name': name,
       'email': email,
-      'profileImage': profileImage,
       'profile_image': profileImage,
-      'profileImageUrl': profileImage,
-      'avatar': profileImage,
-      'avatarUrl': profileImage,
       'school': school,
       'age': age,
       'gender': gender,
-      'phoneNumber': phoneNumber,
+      'phone_number': phoneNumber,
       'preferences': preferences,
     };
   }

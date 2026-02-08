@@ -1,5 +1,6 @@
 import 'package:camp_nest/feature/presentation/provider/questionnaire_provider.dart';
 import 'package:camp_nest/feature/presentation/screens/match_screen.dart';
+import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,14 +10,48 @@ class QuestionnaireScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final questionnaireState = ref.watch(questionnaireProvider);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (questionnaireState.isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Center(
+          child: CircularProgressIndicator(color: theme.primaryColor),
+        ),
+      );
     }
 
     if (questionnaireState.error != null) {
       return Scaffold(
-        body: Center(child: Text('Error: ${questionnaireState.error}')),
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Oops!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: theme.primaryColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Error: ${questionnaireState.error}',
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  // Retry logic here if available
+                },
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 
@@ -39,51 +74,84 @@ class QuestionnaireScreen extends ConsumerWidget {
         questionnaireState.questions.length;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Text(
-          'Question ${questionnaireState.currentQuestionIndex + 1} of ${questionnaireState.questions.length}',
+          'Step ${questionnaireState.currentQuestionIndex + 1} of ${questionnaireState.questions.length}',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
+        centerTitle: true,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        surfaceTintColor: Colors.transparent,
+        leading:
+            questionnaireState.currentQuestionIndex > 0
+                ? IconButton(
+                  onPressed: () {
+                    ref.read(questionnaireProvider.notifier).previousQuestion();
+                  },
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                )
+                : null,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Progress indicator
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation<Color>(
-                Theme.of(context).colorScheme.primary,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Progress indicator
+              FadeInSlide(
+                duration: 0.5,
+                direction: FadeSlideDirection.ltr,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor:
+                        isDark ? Colors.grey[800] : Colors.grey[200],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.primaryColor,
+                    ),
+                  ),
+                ),
               ),
-            ),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 40),
 
-            // Question
-            Text(
-              currentQuestion.question,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
+              // Question
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.1,
+                child: Text(
+                  currentQuestion.question,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
+                ),
+              ),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Answer options
-            Expanded(
-              child: ListView.builder(
-                itemCount: currentQuestion.options.length,
-                itemBuilder: (context, index) {
-                  final option = currentQuestion.options[index];
-                  final currentAnswers =
-                      questionnaireState.answers[currentQuestion.id]?.answers ??
-                      [];
-                  final isSelected = currentAnswers.contains(option);
+              // Answer options
+              Expanded(
+                child: ListView.separated(
+                  itemCount: currentQuestion.options.length,
+                  separatorBuilder:
+                      (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final option = currentQuestion.options[index];
+                    final currentAnswers =
+                        questionnaireState
+                            .answers[currentQuestion.id]
+                            ?.answers ??
+                        [];
+                    final isSelected = currentAnswers.contains(option);
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Card(
+                    return FadeInSlide(
+                      duration: 0.5,
+                      delay: 0.2 + (index * 0.05),
                       child: InkWell(
                         onTap: () {
                           List<String> newAnswers;
@@ -102,66 +170,136 @@ class QuestionnaireScreen extends ConsumerWidget {
                               .read(questionnaireProvider.notifier)
                               .answerQuestion(currentQuestion.id, newAnswers);
                         },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
+                        borderRadius: BorderRadius.circular(16),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border:
+                            color:
                                 isSelected
-                                    ? Border.all(
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                      width: 2,
-                                    )
-                                    : null,
+                                    ? theme.primaryColor.withOpacity(0.05)
+                                    : (isDark
+                                        ? Colors.grey[900]
+                                        : Colors.white),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color:
+                                  isSelected
+                                      ? theme.primaryColor
+                                      : (isDark
+                                          ? Colors.grey[800]!
+                                          : Colors.grey[200]!),
+                              width: isSelected ? 2 : 1.5,
+                            ),
+                            boxShadow:
+                                isSelected
+                                    ? [
+                                      BoxShadow(
+                                        color: theme.primaryColor.withOpacity(
+                                          0.1,
+                                        ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ]
+                                    : [],
                           ),
                           child: Row(
                             children: [
-                              if (currentQuestion.type == 'multiple')
-                                Checkbox(value: isSelected, onChanged: null)
-                              else
-                                Radio<bool>(
-                                  value: true,
-                                  groupValue: isSelected,
-                                  onChanged: null,
-                                ),
-                              const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   option,
-                                  style: const TextStyle(fontSize: 16),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                    color:
+                                        isSelected
+                                            ? theme.primaryColor
+                                            : theme.textTheme.bodyLarge?.color,
+                                  ),
                                 ),
                               ),
+                              const SizedBox(width: 12),
+                              if (currentQuestion.type == 'multiple')
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color:
+                                          isSelected
+                                              ? theme.primaryColor
+                                              : Colors.grey[400]!,
+                                      width: 2,
+                                    ),
+                                    color:
+                                        isSelected
+                                            ? theme.primaryColor
+                                            : Colors.transparent,
+                                  ),
+                                  child:
+                                      isSelected
+                                          ? const Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: Colors.white,
+                                          )
+                                          : null,
+                                )
+                              else
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color:
+                                          isSelected
+                                              ? theme.primaryColor
+                                              : Colors.grey[400]!,
+                                      width: 2,
+                                    ),
+                                    color: Colors.transparent,
+                                  ),
+                                  child:
+                                      isSelected
+                                          ? Center(
+                                            child: Container(
+                                              width: 12,
+                                              height: 12,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: theme.primaryColor,
+                                              ),
+                                            ),
+                                          )
+                                          : null,
+                                ),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
 
-            // Navigation buttons
-            Row(
-              children: [
-                if (questionnaireState.currentQuestionIndex > 0)
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        ref
-                            .read(questionnaireProvider.notifier)
-                            .previousQuestion();
-                      },
-                      child: const Text('Previous'),
-                    ),
-                  ),
+              const SizedBox(height: 24),
 
-                if (questionnaireState.currentQuestionIndex > 0)
-                  const SizedBox(width: 16),
-
-                Expanded(
+              // Navigation button
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.3,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
                   child: ElevatedButton(
                     onPressed:
                         questionnaireState.answers.containsKey(
@@ -173,17 +311,38 @@ class QuestionnaireScreen extends ConsumerWidget {
                                   .nextQuestion();
                             }
                             : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor:
+                          isDark ? Colors.grey[800] : Colors.grey[300],
+                      disabledForegroundColor: Colors.grey[500],
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation:
+                          questionnaireState.answers.containsKey(
+                                currentQuestion.id,
+                              )
+                              ? 4
+                              : 0,
+                      shadowColor: theme.primaryColor.withOpacity(0.4),
+                    ),
                     child: Text(
                       questionnaireState.currentQuestionIndex ==
                               questionnaireState.questions.length - 1
                           ? 'Finish'
                           : 'Next',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

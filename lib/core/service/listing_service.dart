@@ -1,339 +1,306 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:camp_nest/core/model/room_listing.dart';
-import 'package:camp_nest/core/service/auth_service.dart';
-import 'package:http/http.dart' as http;
-import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ListingsService {
-  final AuthService _authService = AuthService();
+  final SupabaseClient _client = Supabase.instance.client;
 
-  // Get all active listings from backend
-  Future<List<RoomListingModel>> getListings({
-    double? maxPrice,
-    String? location,
-    String? genderPreference,
-    double? minPrice,
-    int page = 0,
-    int size = 10,
-    String sort = 'createdAt',
-    String order = 'desc',
-  }) async {
-    // Delegate to the search endpoint with defaults.
-    return await searchListings(
-      location: location,
-      minPrice: minPrice,
-      maxPrice: maxPrice,
-      genderPreference: genderPreference,
-      page: page,
-      size: size,
-      sort: sort,
-      order: order,
-    );
+  // Transform Supabase response to match RoomListingModel structure
+  List<RoomListingModel> _transformData(List<dynamic> data) {
+    return data.map((json) {
+      final map = Map<String, dynamic>.from(json);
+
+      // Transform nested relations (which come as list of objects) into flat lists of strings
+
+      // Images
+      if (map['room_listing_images'] is List) {
+        map['images'] =
+            (map['room_listing_images'] as List)
+                .map((e) => e['images']?.toString() ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList();
+      }
+
+      // Amenities
+      if (map['room_listing_amenities'] is List) {
+        map['amenities'] =
+            (map['room_listing_amenities'] as List)
+                .map((e) => e['amenities']?.toString() ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList();
+      }
+
+      // Rules
+      if (map['room_listing_rules'] is List) {
+        map['rules'] =
+            (map['room_listing_rules'] as List)
+                .map((e) => e['rules']?.toString() ?? '')
+                .where((s) => s.isNotEmpty)
+                .toList();
+      }
+
+      // Owner info (if joined)
+      if (map['owner'] != null) {
+        map['ownerName'] = map['owner']['name'];
+        map['ownerPhone'] = map['owner']['phone_number'];
+      }
+
+      return RoomListingModel.fromJson(map);
+    }).toList();
   }
 
-  // Search listings with query parameters (pagination, sorting, filters)
+  // Get all active listings
+  Future<List<RoomListingModel>> getAllListings({String? school}) async {
+    try {
+      dynamic query = _client
+          .from('room_listings')
+          .select('''
+            *,
+            room_listing_images (images),
+            room_listing_amenities (amenities),
+            room_listing_rules (rules),
+            owner:users!inner (name, phone_number)
+          ''')
+          .eq('is_active', true);
+
+      if (school != null && school.isNotEmpty) {
+        query = query.eq('school', school);
+      }
+
+      final response = await query.order('created_at', ascending: false);
+
+      return _transformData(response as List);
+    } catch (e) {
+      print('Error fetching listings: $e');
+      throw Exception('Failed to fetch listings');
+    }
+  }
+
+  /// Fetch listings owned by the current user
+  Future<List<RoomListingModel>> getMyListings() async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      final response = await _client
+          .from('room_listings')
+          .select('''
+            *,
+            room_listing_images (images),
+            room_listing_amenities (amenities),
+            room_listing_rules (rules),
+            owner:users!inner (name, phone_number)
+          ''')
+          .eq('owner_id', user.id)
+          .order('created_at', ascending: false);
+
+      return _transformData(response as List);
+    } catch (e) {
+      print('Error fetching my listings: $e');
+      throw Exception('Failed to fetch my listings');
+    }
+  }
+
+  // Search listings with filters
   Future<List<RoomListingModel>> searchListings({
     String? location,
     double? minPrice,
     double? maxPrice,
     String? genderPreference,
-    int page = 0,
-    int size = 10,
-    String sort = 'createdAt',
-    String order = 'desc',
+    int? page,
+    int? size,
+    String? sort,
+    String? order,
+    String? school,
   }) async {
-    final token = await _authService.getToken();
-    print(
-      '🔍 DEBUG searchListings: token = ${token?.substring(0, 20) ?? 'null'}...',
-    );
-
-    if (token == null) {
-      print('❌ No authentication token found in searchListings');
-      throw Exception('No authentication token found');
-    }
-
-    // Check if token is expired
     try {
-      if (JwtDecoder.isExpired(token)) {
-        print('❌ Token is expired in searchListings');
-        throw Exception('Authentication token has expired');
+      dynamic query = _client
+          .from('room_listings')
+          .select('''
+            *,
+            room_listing_images (images),
+            room_listing_amenities (amenities),
+            room_listing_rules (rules),
+            owner:users!inner (name, phone_number)
+          ''')
+          .eq('is_active', true);
+
+      if (location != null && location.isNotEmpty) {
+        query = query.ilike('location', '%$location%');
       }
+
+      if (minPrice != null) {
+        query = query.gte('price', minPrice);
+      }
+
+      if (maxPrice != null) {
+        query = query.lte('price', maxPrice);
+      }
+
+      if (genderPreference != null &&
+          genderPreference.isNotEmpty &&
+          genderPreference != 'any') {
+        query = query.eq('gender_preference', genderPreference);
+      }
+
+      if (school != null && school.isNotEmpty) {
+        query = query.eq('school', school);
+      }
+
+      // Handle sort
+      if (sort != null) {
+        query = query.order(sort, ascending: order == 'asc');
+      } else {
+        query = query.order('created_at', ascending: false);
+      }
+
+      // Handle pagination
+      if (page != null && size != null) {
+        final start = page * size;
+        final end = start + size - 1;
+        query = query.range(start, end);
+      }
+
+      final response = await query;
+      return _transformData(response as List);
     } catch (e) {
-      print('❌ Error checking token expiry: $e');
-      throw Exception('Invalid authentication token');
-    }
-
-    final baseUrl = _authService.baseUrl;
-    print('🌐 DEBUG: Using base URL: $baseUrl');
-    final uriBase = Uri.parse('$baseUrl/api/listings/search');
-
-    final qp = <String, String>{
-      'page': page.toString(),
-      'size': size.toString(),
-      'sort': sort,
-      'order': order,
-    };
-    if (location != null && location.isNotEmpty) qp['location'] = location;
-    if (minPrice != null) qp['minPrice'] = minPrice.toString();
-    if (maxPrice != null) qp['maxPrice'] = maxPrice.toString();
-    if (genderPreference != null && genderPreference.isNotEmpty)
-      qp['genderPreference'] = genderPreference;
-
-    final uri = uriBase.replace(queryParameters: qp);
-    print('📡 GET /api/listings/search uri: $uri');
-
-    final headers = {
-      'Authorization': 'Bearer $token',
-      'Content-Type': 'application/json',
-    };
-    print('📋 Headers: ${headers.keys.toList()}');
-
-    final resp = await http.get(uri, headers: headers);
-
-    print(
-      '📥 GET /api/listings/search status ${resp.statusCode}: ${resp.body}',
-    );
-
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      if (data is List) {
-        print('✅ Successfully loaded ${data.length} listings from search');
-        return data
-            .map<RoomListingModel>((e) => RoomListingModel.fromJson(e))
-            .toList();
-      }
+      print('Error searching listings: $e');
       return [];
-    } else if (resp.statusCode == 403) {
-      print('❌ 403 Forbidden - Authentication failed');
-      print('🔍 Response body: ${resp.body}');
-      throw Exception('Authentication failed (403): ${resp.body}');
-    } else if (resp.statusCode == 401) {
-      print('❌ 401 Unauthorized - Token invalid or expired');
-      throw Exception('Token invalid or expired (401): ${resp.body}');
     }
-    throw Exception('Search listings failed: ${resp.statusCode} ${resp.body}');
   }
 
-  // Fetch all listings (no search filters) from /api/listings
-  Future<List<RoomListingModel>> getAllListings() async {
-    final token = await _authService.getToken();
-    print(
-      '🔍 DEBUG getAllListings: token = ${token?.substring(0, 20) ?? 'null'}...',
-    );
-
-    if (token == null) {
-      print('❌ No authentication token found in getAllListings');
-      throw Exception('No authentication token found');
-    }
-
-    // Check if token is expired
-    try {
-      if (JwtDecoder.isExpired(token)) {
-        print('❌ Token is expired in getAllListings');
-        throw Exception('Authentication token has expired');
-      }
-    } catch (e) {
-      print('❌ Error checking token expiry: $e');
-      throw Exception('Invalid authentication token');
-    }
-
-    final baseUrl = _authService.baseUrl;
-    print('🌐 DEBUG: Using base URL: $baseUrl');
-    final uri = Uri.parse('$baseUrl/api/listings');
-    print('📡 GET /api/listings uri: $uri');
-
-    final headers = {
-      'Authorization': 'Bearer $token',
-      'Content-Type': 'application/json',
-    };
-    print('📋 Headers: ${headers.keys.toList()}');
-
-    final resp = await http.get(uri, headers: headers);
-    print('📥 GET /api/listings status ${resp.statusCode}: ${resp.body}');
-
-    if (resp.statusCode == 200) {
-      final data = jsonDecode(resp.body);
-      if (data is List) {
-        print('✅ Successfully loaded ${data.length} listings');
-        return data
-            .map<RoomListingModel>((e) => RoomListingModel.fromJson(e))
-            .toList();
-      }
-      return [];
-    } else if (resp.statusCode == 403) {
-      print('❌ 403 Forbidden - Authentication failed');
-      print('🔍 Response body: ${resp.body}');
-      throw Exception('Authentication failed (403): ${resp.body}');
-    } else if (resp.statusCode == 401) {
-      print('❌ 401 Unauthorized - Token invalid or expired');
-      throw Exception('Token invalid or expired (401): ${resp.body}');
-    }
-    throw Exception(
-      'Fetch all listings failed: ${resp.statusCode} ${resp.body}',
-    );
-  }
-
-  // Create a new listing (placeholder; replace with REST call)
+  // Create a new listing
   Future<RoomListingModel?> createListing({
     required RoomListingModel listing,
-    List<File>? files, // if provided, send multipart/form-data
+    List<File>? files,
   }) async {
-    final token = await _authService.getToken();
-    if (token == null) {
-      throw Exception('No authentication token found');
-    }
-
-    final baseUrl = _authService.baseUrl; // same base as auth
-
-    if (files != null && files.isNotEmpty) {
-      final uri = Uri.parse('$baseUrl/api/listings');
-      final request = http.MultipartRequest('POST', uri)
-        ..headers['Authorization'] = 'Bearer $token';
-
-      // listing JSON part
-      final payloadMap = {
-        'title': listing.title,
-        'description': listing.description,
-        'price': listing.price,
-        'location': listing.location,
-        'images': listing.images,
-        'mediaUrls': <String>[],
-        'amenities': listing.amenities,
-        'rules': listing.rules,
-        'genderPreference': listing.gender,
-        'availableFrom':
-            listing.availableFrom.toIso8601String().split('T').first,
-        'isActive': listing.isActive,
-        // ownerId is taken from JWT by backend
-        // send both camelCase and snake_case variants in case backend expects one
-        'ownerPhone': listing.ownerPhone,
-        'owner_phone': listing.ownerPhone,
-        'whatsappLink': listing.whatsappLink,
-        'whatsapp_link': listing.whatsappLink,
-      };
-
-      final listingPayload = jsonEncode(payloadMap);
-      // final listingJson = jsonEncode(listingPayload['listing']);
-      request.fields['listing'] = listingPayload;
-      print(
-        'POST /api/listings (multipart) payloadMap.rules: ${payloadMap['rules']}',
-      );
-      print('POST /api/listings (multipart) listing JSON: ' + listingPayload);
-
-      // attach files
-      for (final f in files) {
-        final multipart = await http.MultipartFile.fromPath('files[]', f.path);
-        request.files.add(multipart);
-      }
-
-      final streamed = await request.send();
-      final response = await http.Response.fromStream(streamed);
-      print('Response ${response.statusCode}: ' + response.body);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return RoomListingModel.fromJson(data);
-      }
-      throw Exception(
-        'Create listing failed: ${response.statusCode} ${response.body}',
-      );
-    } else {
-      // JSON only (URLs already available)
-      final uri = Uri.parse('$baseUrl/api/listings');
-      final headers = {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      };
-      final bodyMap = {
-        'title': listing.title,
-        'description': listing.description,
-        'price': listing.price,
-        'location': listing.location,
-        'images': listing.images,
-        'mediaUrls': <String>[],
-        'amenities': listing.amenities,
-        'rules': listing.rules,
-        'genderPreference': listing.gender,
-        'availableFrom':
-            listing.availableFrom.toIso8601String().split('T').first,
-        'isActive': listing.isActive,
-        // include both naming conventions so backend accepts either
-        'ownerPhone': listing.ownerPhone,
-        'owner_phone': listing.ownerPhone,
-        'whatsappLink': listing.whatsappLink,
-        'whatsapp_link': listing.whatsappLink,
-      };
-
-      final body = jsonEncode(bodyMap);
-
-      print('POST /api/listings (json) bodyMap.rules: ${bodyMap['rules']}');
-      print('POST /api/listings (json) headers: $headers');
-      print('POST /api/listings (json) body: $body');
-
-      final resp = await http.post(uri, headers: headers, body: body);
-      print(
-        'POST /api/listings (json) status ${resp.statusCode}: ' + resp.body,
-      );
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body);
-        return RoomListingModel.fromJson(data);
-      }
-      throw Exception('Create listing failed: ${resp.statusCode} ${resp.body}');
-    }
-  }
-
-  // Update a listing (placeholder; replace with REST call)
-  Future<RoomListingModel> updateListing(RoomListingModel listing) async {
-    // TODO: Replace with PUT /api/listings/{id}
-    return listing;
-  }
-
-  // Delete a listing (placeholder; replace with REST call)
-  Future<void> deleteListing(String listingId) async {
-    final token = await _authService.getToken();
-    if (token == null) {
-      throw Exception('No authentication token found');
-    }
-
-    final uri = Uri.parse('${_authService.baseUrl}/api/listings/$listingId');
-    final resp = await http.delete(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-
-    print(
-      'DELETE /api/listings/$listingId status ${resp.statusCode}: ${resp.body}',
-    );
-    if (resp.statusCode == 200 || resp.statusCode == 204) {
-      return;
-    }
-
-    throw Exception('Delete listing failed: ${resp.statusCode} ${resp.body}');
-  }
-
-  // Get user's listings (placeholder; replace with REST call)
-  Future<List<RoomListingModel>> getUserListings(String userId) async {
-    // TODO: Replace with GET /api/users/{userId}/listings
-    return await getListings();
-  }
-
-  // Debug method to check token
-  Future<void> debugToken() async {
-    final token = await _authService.getToken();
-    if (token == null) {
-      print('❌ No token found');
-      return;
-    }
-
     try {
-      final decoded = JwtDecoder.decode(token);
-      print('🔍 Token decoded: $decoded');
-      print('🔍 Token expired: ${JwtDecoder.isExpired(token)}');
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      // 1. Upload Images
+      List<String> imageUrls = [];
+      if (files != null) {
+        for (var file in files) {
+          final ext = file.path.split('.').last;
+          final path =
+              '${user.id}/${DateTime.now().millisecondsSinceEpoch}.$ext';
+          await _client.storage.from('listing-images').upload(path, file);
+          final url = _client.storage.from('listing-images').getPublicUrl(path);
+          imageUrls.add(url);
+        }
+      } else {
+        imageUrls = listing.images;
+      }
+
+      // 2. Insert Core Listing
+      final listingData = listing.toJson();
+      listingData['owner_id'] = user.id;
+      // Remove these fields as they are in separate tables or not column names
+      listingData.remove('id');
+      listingData.remove('images');
+      listingData.remove('amenities');
+      listingData.remove('rules');
+      listingData.remove('owner_name');
+      listingData.remove('ownerPhone');
+      listingData.remove('whatsappLink');
+
+      final response =
+          await _client
+              .from('room_listings')
+              .insert(listingData)
+              .select()
+              .single();
+
+      final newId = response['id'];
+
+      // 3. Insert Relations
+      // Images
+      if (imageUrls.isNotEmpty) {
+        await _client
+            .from('room_listing_images')
+            .insert(
+              imageUrls
+                  .map((url) => {'room_listing_id': newId, 'images': url})
+                  .toList(),
+            );
+      }
+
+      // Amenities
+      if (listing.amenities.isNotEmpty) {
+        await _client
+            .from('room_listing_amenities')
+            .insert(
+              listing.amenities
+                  .map((item) => {'room_listing_id': newId, 'amenities': item})
+                  .toList(),
+            );
+      }
+
+      // Rules
+      if (listing.rules.isNotEmpty) {
+        await _client
+            .from('room_listing_rules')
+            .insert(
+              listing.rules
+                  .map((item) => {'room_listing_id': newId, 'rules': item})
+                  .toList(),
+            );
+      }
+
+      return listing; // Should ideally return refetched object
     } catch (e) {
-      print('❌ Error decoding token: $e');
+      print('Error creating listing: $e');
+      throw Exception('Create listing failed: $e');
+    }
+  }
+
+  // Update a listing
+  Future<RoomListingModel?> updateListing(RoomListingModel listing) async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      // Update core data
+      final updates = listing.toJson();
+      // Remove relation fields and id
+      updates.remove('id');
+      updates.remove('images');
+      updates.remove('amenities');
+      updates.remove('rules');
+      updates.remove('owner_name');
+      updates.remove('ownerPhone');
+      updates.remove('whatsappLink');
+
+      await _client
+          .from('room_listings')
+          .update(updates)
+          .eq('id', listing.id)
+          .eq('owner_id', user.id); // Security check
+
+      // Handle relations? (Complex: you delete old, insert new)
+      // For migration MVP, we might skip complex relation updates or implement straightforward logic
+      // e.g. delete all amenities for this listing and re-insert.
+
+      return listing;
+    } catch (e) {
+      throw Exception('Update failed: $e');
+    }
+  }
+
+  // Delete a listing
+  Future<void> deleteListing(String id) async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      await _client
+          .from('room_listings')
+          .delete()
+          .eq('id', id)
+          .eq('owner_id', user.id);
+    } catch (e) {
+      throw Exception('Delete failed: $e');
     }
   }
 }

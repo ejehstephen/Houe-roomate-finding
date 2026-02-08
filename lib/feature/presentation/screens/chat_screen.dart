@@ -1,3 +1,4 @@
+import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:flutter/material.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -16,6 +17,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [
     ChatMessage(
       text: "Hi! I saw we're a great match as roommates. Would love to chat!",
@@ -38,7 +40,18 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   void _sendMessage() {
@@ -53,27 +66,68 @@ class _ChatScreenState extends State<ChatScreen> {
         );
         _messageController.clear();
       });
+      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(widget.roommateName),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: theme.primaryColor.withOpacity(0.1),
+              child: Text(
+                widget.roommateName.isNotEmpty
+                    ? widget.roommateName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: theme.primaryColor,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.roommateName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Text(
+                    'Online',
+                    style: TextStyle(fontSize: 12, color: Colors.green),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        elevation: 0,
+        backgroundColor: theme.appBarTheme.backgroundColor,
+        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
-            onPressed: () {
-              // Video call functionality
-            },
-            icon: const Icon(Icons.videocam_outlined),
+            onPressed: () {},
+            icon: Icon(Icons.videocam_outlined, color: theme.iconTheme.color),
           ),
           IconButton(
-            onPressed: () {
-              // Voice call functionality
-            },
-            icon: const Icon(Icons.call_outlined),
+            onPressed: () {},
+            icon: Icon(Icons.call_outlined, color: theme.iconTheme.color),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -81,11 +135,22 @@ class _ChatScreenState extends State<ChatScreen> {
           // Messages
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                return _MessageBubble(message: message);
+                return FadeInSlide(
+                  duration: 0.3,
+                  direction:
+                      message.isMe
+                          ? FadeSlideDirection.ltr
+                          : FadeSlideDirection.rtl,
+                  child: _MessageBubble(
+                    message: message,
+                    roommateName: widget.roommateName,
+                  ),
+                );
               },
             ),
           ),
@@ -94,37 +159,67 @@ class _ChatScreenState extends State<ChatScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(top: BorderSide(color: Colors.grey.shade300)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendMessage(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _sendMessage,
-                  icon: const Icon(Icons.send),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Colors.white,
-                  ),
+              color: isDark ? Colors.grey[900] : Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
                 ),
               ],
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () {},
+                    icon: Icon(
+                      Icons.add_circle_outline,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[800] : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.transparent),
+                      ),
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: InputDecoration(
+                          hintText: 'Type a message...',
+                          border: InputBorder.none,
+                          hintStyle: TextStyle(color: Colors.grey[500]),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
+                          ),
+                        ),
+                        maxLines: null,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: theme.primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -147,53 +242,88 @@ class ChatMessage {
 
 class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
+  final String roommateName;
 
-  const _MessageBubble({required this.message});
+  const _MessageBubble({required this.message, required this.roommateName});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final time =
+        "${message.timestamp.hour}:${message.timestamp.minute.toString().padLeft(2, '0')}";
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment:
-            message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment:
+            message.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          if (!message.isMe) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: NetworkImage(
-                '/placeholder.svg?height=32&width=32',
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color:
-                    message.isMe
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  color: message.isMe ? Colors.white : Colors.black87,
+          Row(
+            mainAxisAlignment:
+                message.isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!message.isMe) ...[
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: theme.primaryColor.withOpacity(0.1),
+                  child: Text(
+                    roommateName.isNotEmpty
+                        ? roommateName[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: theme.primaryColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        message.isMe
+                            ? theme.primaryColor
+                            : (isDark ? Colors.grey[800] : Colors.grey[200]),
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: Radius.circular(message.isMe ? 20 : 4),
+                      bottomRight: Radius.circular(message.isMe ? 4 : 20),
+                    ),
+                  ),
+                  child: Text(
+                    message.text,
+                    style: TextStyle(
+                      color:
+                          message.isMe
+                              ? Colors.white
+                              : (isDark ? Colors.white : Colors.black87),
+                      fontSize: 15,
+                    ),
+                  ),
                 ),
               ),
+            ],
+          ),
+          Padding(
+            padding: EdgeInsets.only(
+              top: 4,
+              left: message.isMe ? 0 : 36,
+              right: message.isMe ? 0 : 0,
+            ),
+            child: Text(
+              time,
+              style: TextStyle(fontSize: 10, color: Colors.grey[500]),
             ),
           ),
-          if (message.isMe) ...[
-            const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: NetworkImage(
-                '/placeholder.svg?height=32&width=32',
-              ),
-            ),
-          ],
         ],
       ),
     );

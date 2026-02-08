@@ -2,13 +2,14 @@ import 'package:camp_nest/core/extension/error_extension.dart';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/service/image_upload_service.dart';
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
-import 'package:file_picker/file_picker.dart' as fp;
+import 'package:camp_nest/feature/presentation/widget/Media.dart';
 
 class PostListingScreen extends ConsumerStatefulWidget {
   const PostListingScreen({super.key});
@@ -69,35 +70,29 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
     super.dispose();
   }
 
-  Future<void> _pickMedia() async {
+  Future<void> _pickImages() async {
     try {
+      // Use image_picker for both web and mobile
+      final List<XFile> picked = await _picker.pickMultipleMedia();
+      if (picked.isEmpty) return;
+
+      final limited = picked.take(5 - _selectedImages.length).toList();
       if (kIsWeb) {
-        // Use file_picker for web
-        final res = await fp.FilePicker.platform.pickFiles(
-          allowMultiple: true,
-          withData: true, // get bytes
-          type: fp.FileType.custom,
-          allowedExtensions: ['jpg','jpeg','png','webp'],
-        );
-        if (res != null && res.files.isNotEmpty) {
-          final files = res.files.take(5).toList();
+        // Store bytes and names for web
+        for (final x in limited) {
+          if (_selectedImageBytes.length >= 5) break;
+          final b = await x.readAsBytes();
           setState(() {
-            _selectedImageBytes = files.where((f) => f.bytes != null).map((f) => f.bytes!).toList();
-            _selectedFilenames = files.map((f) => f.name).toList();
-            _selectedImages.clear(); // clear mobile list
+            _selectedImageBytes.add(b);
+            _selectedFilenames.add(x.name);
           });
         }
       } else {
-        // Mobile/desktop via image_picker
-        final List<XFile> mediaFiles = await _picker.pickMultipleMedia();
-        if (mediaFiles.isNotEmpty) {
-          final limitedFiles = mediaFiles.take(5).toList();
-          setState(() {
-            _selectedImages = limitedFiles.map((xFile) => File(xFile.path)).toList();
-            _selectedImageBytes.clear();
-            _selectedFilenames.clear();
-          });
-        }
+        setState(() {
+          if (_selectedImages.length < 5) {
+            _selectedImages.addAll(limited.map((x) => File(x.path)));
+          }
+        });
       }
     } catch (e) {
       e.showError(context, duration: const Duration(seconds: 4));
@@ -105,11 +100,6 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
   }
 
   Future<void> _takePicture() async {
-    if (kIsWeb) {
-      // Camera access via image_picker is limited on web; fall back to file picker
-      await _pickMedia();
-      return;
-    }
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
@@ -117,11 +107,22 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
         maxHeight: 1080,
         imageQuality: 80,
       );
+      if (image == null) return;
 
-      if (image != null && _selectedImages.length < 5) {
+      if (kIsWeb) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          if (_selectedImageBytes.length < 5) {
+            _selectedImageBytes.add(bytes);
+            _selectedFilenames.add(image.name);
+          }
+        });
+      } else {
         final file = File(image.path);
         setState(() {
-          _selectedImages.add(file);
+          if (_selectedImages.length < 5) {
+            _selectedImages.add(file);
+          }
         });
       }
     } catch (e) {
@@ -158,15 +159,16 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
+                        onPressed: () async {
                           Navigator.pop(context);
-                          _pickMedia();
+                          // photos & videos
+                          await _pickImages();
                         },
                         icon: const Icon(Icons.photo_library),
-                        label: const Text('Gallery'),
+                        label: const Text('Photos & Videos'),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () {
@@ -214,7 +216,9 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
         // Upload images if any are selected
         if (kIsWeb && _selectedImageBytes.isNotEmpty) {
-          print('Starting web image upload for ${_selectedImageBytes.length} images');
+          print(
+            'Starting web image upload for ${_selectedImageBytes.length} images',
+          );
           imageUrls = await _imageUploadService.uploadMultipleBytes(
             _selectedImageBytes,
             _selectedFilenames,
@@ -238,6 +242,13 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
 
         print('Image URLs to be stored in RoomListingModel: $imageUrls');
 
+        final user = ref.read(authProvider).user;
+        if (user == null || user.school.isEmpty) {
+          throw Exception(
+            'User school information is missing. Please update your profile.',
+          );
+        }
+
         final listing = RoomListingModel(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           title: _titleController.text,
@@ -245,16 +256,17 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
           price: double.parse(_priceController.text),
           location: _locationController.text,
           images: imageUrls,
-          ownerId: 'current_user_id',
-          ownerName: 'Current User',
+          ownerId: user.id, // Use actual user ID
+          ownerName: user.name, // Use actual user name
           ownerPhone:
               _ownerPhoneController.text.isNotEmpty
                   ? _ownerPhoneController.text
-                  : null,
+                  : user.phoneNumber, // Fallback to profile phone
           amenities: _selectedAmenities,
           rules: _rules,
           gender: _selectedGender,
           availableFrom: DateTime.now().add(const Duration(days: 7)),
+          school: user.school,
         );
 
         print('Creating listing with images: ${listing.images}');
@@ -297,6 +309,14 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
     }
   }
 
+  bool _isVideo(String path) {
+    final lower = path.toLowerCase();
+    return lower.endsWith('.mp4') ||
+        lower.endsWith('.mov') ||
+        lower.endsWith('.avi') ||
+        lower.endsWith('.mkv');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -317,7 +337,8 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                   border: Border.all(color: Colors.grey[300]!),
                 ),
                 child:
-                    (!kIsWeb && _selectedImages.isEmpty) || (kIsWeb && _selectedImageBytes.isEmpty)
+                    (!kIsWeb && _selectedImages.isEmpty) ||
+                            (kIsWeb && _selectedImageBytes.isEmpty)
                         ? const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -344,31 +365,32 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                           children: [
                             ClipRRect(
                               borderRadius: BorderRadius.circular(12),
-                              child: kIsWeb
-                                  ? Image.memory(
-                                      _selectedImageBytes.first,
-                                      width: double.infinity,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Image.file(
-                                      _selectedImages.first,
-                                      width: double.infinity,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print('Image display error: $error');
-                                        return Container(
-                                          color: Colors.grey[400],
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.error,
-                                              color: Colors.red,
+                              child:
+                                  kIsWeb
+                                      ? _isVideo(_selectedFilenames.first)
+                                          ? Container(
+                                            color: Colors.black,
+                                            height: 200,
+                                            width: double.infinity,
+                                            child: const Center(
+                                              child: Icon(
+                                                Icons.play_circle_outline,
+                                                color: Colors.white,
+                                                size: 64,
+                                              ),
                                             ),
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                          )
+                                          : Image.memory(
+                                            _selectedImageBytes.first,
+                                            width: double.infinity,
+                                            height: 200,
+                                            fit: BoxFit.cover,
+                                          )
+                                      : MediaDisplayWidget(
+                                        file: _selectedImages.first,
+                                        isThumbnail: true,
+                                        fit: BoxFit.cover,
+                                      ),
                             ),
                             Positioned(
                               bottom: 8,
@@ -383,7 +405,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Text(
-                                  '${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length)} image${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length) > 1 ? 's' : ''}',
+                                  '${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length)} file${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length) > 1 ? 's' : ''}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
@@ -412,14 +434,22 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
             ),
 
             // Show selected images
-            if ((!kIsWeb && _selectedImages.isNotEmpty) || (kIsWeb && _selectedImageBytes.isNotEmpty)) ...[
+            if ((!kIsWeb && _selectedImages.isNotEmpty) ||
+                (kIsWeb && _selectedImageBytes.isNotEmpty)) ...[
               const SizedBox(height: 16),
               SizedBox(
                 height: 80,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: kIsWeb ? _selectedImageBytes.length : _selectedImages.length,
+                  itemCount:
+                      kIsWeb
+                          ? _selectedImageBytes.length
+                          : _selectedImages.length,
                   itemBuilder: (context, index) {
+                    final isVideo =
+                        kIsWeb
+                            ? _isVideo(_selectedFilenames[index])
+                            : _isVideo(_selectedImages[index].path);
                     return Container(
                       width: 80,
                       margin: const EdgeInsets.only(right: 8),
@@ -427,28 +457,31 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: kIsWeb
-                                ? Image.memory(
-                                    _selectedImageBytes[index],
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Image.file(
-                                    _selectedImages[index],
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: Colors.grey[400],
-                                        child: const Icon(
-                                          Icons.error,
-                                          color: Colors.red,
-                                        ),
-                                      );
-                                    },
-                                  ),
+                            child:
+                                kIsWeb
+                                    ? isVideo
+                                        ? Container(
+                                          width: 80,
+                                          height: 80,
+                                          color: Colors.black,
+                                          child: const Center(
+                                            child: Icon(
+                                              Icons.videocam,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                        : Image.memory(
+                                          _selectedImageBytes[index],
+                                          width: 80,
+                                          height: 80,
+                                          fit: BoxFit.cover,
+                                        )
+                                    : MediaDisplayWidget(
+                                      file: _selectedImages[index],
+                                      isThumbnail: true,
+                                      fit: BoxFit.cover,
+                                    ),
                           ),
                           Positioned(
                             top: 4,

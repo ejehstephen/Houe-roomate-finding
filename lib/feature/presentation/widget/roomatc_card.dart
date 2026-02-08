@@ -1,5 +1,6 @@
 import 'package:camp_nest/core/model/roomate_matching.dart';
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -28,8 +29,11 @@ class RoommateCard extends ConsumerWidget {
               children: [
                 CircleAvatar(
                   radius: 50,
-                  backgroundColor: Colors.transparent,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).primaryColor.withOpacity(0.2),
                   backgroundImage: _resolveAvatarImage(),
+                  onBackgroundImageError: (_, __) {},
                   child: _resolveAvatarChild(),
                 ),
                 const SizedBox(width: 16),
@@ -192,23 +196,45 @@ class RoommateCard extends ConsumerWidget {
         (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty)
             ? avatarOverrideUrl!
             : match.profileImage;
+
     if (url.trim().isEmpty) return null;
-    // Normalize relative URLs if your backend returns paths
-    if (url.startsWith('/')) {
-      // Fallback to a relative path; app should prefix with base if needed at fetch time
+
+    // Check if it's a valid URL
+    if (url.startsWith('http://') || url.startsWith('https://')) {
       return NetworkImage(url);
     }
-    return NetworkImage(url);
+
+    // Fallback for relative paths
+    if (url.startsWith('/')) {
+      return NetworkImage(url);
+    }
+
+    return null;
   }
 
   Widget? _resolveAvatarChild() {
-    final hasImage =
-        (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty) ||
-        match.profileImage.trim().isNotEmpty;
-    if (hasImage) return null;
+    final url =
+        (avatarOverrideUrl != null && avatarOverrideUrl!.trim().isNotEmpty)
+            ? avatarOverrideUrl!
+            : match.profileImage;
+
+    final hasValidImage =
+        url.trim().isNotEmpty &&
+        (url.startsWith('http://') || url.startsWith('https://'));
+
+    if (hasValidImage) return null;
+
+    // Show initials as fallback
     final initial =
         match.name.isNotEmpty ? match.name.substring(0, 1).toUpperCase() : 'U';
-    return Text(initial, style: const TextStyle(fontSize: 18));
+    return Text(
+      initial,
+      style: TextStyle(
+        fontSize: 32,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey[700],
+      ),
+    );
   }
 
   Color _getCompatibilityColor(int score) {
@@ -248,61 +274,79 @@ class RoommateCard extends ConsumerWidget {
   }
 
   Future<void> _contactViaWhatsApp(BuildContext context, WidgetRef ref) async {
-    if (match.phoneNumber == null || match.phoneNumber!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This user hasn\'t added a phone number yet'),
-        ),
-      );
+    final phone = match.phoneNumber;
+
+    // 1. Basic validation
+    if (phone == null || phone.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This user hasn\'t added a phone number yet'),
+          ),
+        );
+      }
       return;
     }
 
-    // Sanitize and normalize matched user's phone number
-    String phoneNumber = match.phoneNumber!;
+    final message = Uri.encodeComponent(
+      "Hi ${match.name}! I found you through CampNest and would like to discuss potential roommate arrangements.",
+    );
 
-    // Add +234 prefix if not present
-    if (!phoneNumber.startsWith('+234') && !phoneNumber.startsWith('234')) {
-      if (phoneNumber.startsWith('0')) {
-        phoneNumber = '+234${phoneNumber.substring(1)}';
-      } else {
-        phoneNumber = '+234$phoneNumber';
+    // 2. Generate candidate phone numbers
+    final cleaned = phone.replaceAll(RegExp(r'\D'), '');
+    final candidates = <String>{};
+    if (cleaned.isNotEmpty) candidates.add(cleaned);
+
+    if (cleaned.startsWith('0')) {
+      final withoutZero = cleaned.replaceFirst(RegExp(r'^0+'), '');
+      if (withoutZero.isNotEmpty) {
+        candidates.add(withoutZero);
+        candidates.add('234$withoutZero');
       }
     }
 
-    // Sanitize phone number
-    final sanitizedPhone = phoneNumber.replaceAll(RegExp(r'[\s\-()]+'), '');
-    final normalizedPhone =
-        sanitizedPhone.startsWith('+')
-            ? sanitizedPhone.substring(1)
-            : sanitizedPhone;
+    if (cleaned.length <= 10 && !cleaned.startsWith('234')) {
+      candidates.add('234$cleaned');
+    }
 
-    // Create WhatsApp URL
-    final whatsappUrl =
-        'https://wa.me/$normalizedPhone?text=${Uri.encodeComponent('Hi ${match.name}! I found you through CampNest and would like to discuss potential roommate arrangements.')}';
+    final candidatesWithPlus =
+        candidates.map((c) => c.startsWith('+') ? c : '+$c').toList();
 
-    // Launch WhatsApp
-    try {
-      final uri = Uri.parse(whatsappUrl);
-      final canLaunch = await canLaunchUrl(uri);
-      if (canLaunch) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
+    bool launched = false;
+
+    // 3. Try launching WhatsApp with robust schemes
+    for (final cand in [...candidates, ...candidatesWithPlus]) {
+      final candDigits = cand.replaceAll(RegExp(r'[^0-9]'), '');
+      final schemes = [
+        Uri.parse('whatsapp://send?phone=$candDigits&text=$message'),
+        Uri.parse('https://wa.me/$candDigits?text=$message'),
+      ];
+
+      for (final uri in schemes) {
+        try {
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            launched = true;
+            return;
+          }
+        } catch (e) {
+          print('Launch error for $cand: $e');
+        }
+      }
+    }
+
+    // 4. Fallback: Copy to clipboard if launch failed
+    if (!launched) {
+      await Clipboard.setData(ClipboardData(text: phone));
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Unable to open WhatsApp. Please make sure WhatsApp is installed.',
+              'WhatsApp not available. Phone number copied to clipboard.',
             ),
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Unable to open WhatsApp. Please make sure WhatsApp is installed.',
-          ),
-        ),
-      );
     }
   }
 }

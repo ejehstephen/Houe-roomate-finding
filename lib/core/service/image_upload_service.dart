@@ -1,109 +1,84 @@
 // ignore_for_file: avoid_print
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:camp_nest/core/service/auth_service.dart';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ImageUploadService {
-  final AuthService _authService = AuthService();
+  final SupabaseClient _client = Supabase.instance.client;
 
-  // Upload image by sending base64 payload to the backend /api/files/upload
-  // Assumption: the endpoint expects JSON { "file": "<base64 string>" }
-  // and returns a string (URL or path) in the response body on success.
+  // Upload image from file (mobile/desktop)
   Future<String> uploadImage(File imageFile, String folder) async {
     try {
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
+
+      // Map folder to bucket name
+      final bucketName = _getBucketName(folder);
+
+      final fileExt = imageFile.path.split('.').last.toLowerCase();
+      final fileName =
+          '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
       final bytes = await imageFile.readAsBytes();
 
-      final token = await _authService.getToken();
-      final uri = Uri.parse('${_authService.baseUrl}/api/files/upload');
+      await _client.storage
+          .from(bucketName)
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: _getContentType(fileExt),
+              upsert: false,
+            ),
+          );
 
-      final request = http.MultipartRequest('POST', uri);
-      if (token != null) request.headers['Authorization'] = 'Bearer $token';
-      // Include folder/category hint if backend supports it
-      request.fields['folder'] = folder;
-
-      final filename = imageFile.path.split(Platform.pathSeparator).last;
-      final multipartFile = http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: filename,
-      );
-      request.files.add(multipartFile);
-
-      print('Image upload POST to: $uri');
-      print('Image upload request fields: '+ request.fields.toString());
-      final streamed = await request.send();
-      final resp = await http.Response.fromStream(streamed);
-      print('Image upload POST ${resp.statusCode}: ${resp.body}');
-
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        // Server returns a plain URL string (Cloudinary controller returns plain URL)
-        // Try to parse JSON or return raw body
-        try {
-          final decoded = jsonDecode(resp.body);
-          if (decoded is Map && decoded.containsKey('url')) {
-            return decoded['url'] as String;
-          }
-          if (decoded is String) return decoded;
-        } catch (_) {
-          return resp.body;
-        }
-        return resp.body;
-      }
-
-      throw Exception('Image upload failed: ${resp.statusCode} ${resp.body}');
+      final imageUrl = _client.storage.from(bucketName).getPublicUrl(fileName);
+      print('Image uploaded to Supabase: $imageUrl');
+      return imageUrl;
     } catch (e) {
       print('uploadImage error: $e');
       rethrow;
     }
   }
 
-  // Upload raw bytes (for Flutter web) via multipart
-  Future<String> uploadImageBytes(Uint8List bytes, String filename, String folder) async {
+  // Upload image from bytes (web)
+  Future<String> uploadImageBytes(
+    Uint8List bytes,
+    String filename,
+    String folder,
+  ) async {
     try {
-      final token = await _authService.getToken();
-      final uri = Uri.parse('${_authService.baseUrl}/api/files/upload');
+      final userId = _client.auth.currentUser?.id;
+      if (userId == null) throw Exception('User not authenticated');
 
-      final request = http.MultipartRequest('POST', uri);
-      if (token != null) request.headers['Authorization'] = 'Bearer $token';
-      request.fields['folder'] = folder;
+      final bucketName = _getBucketName(folder);
 
-      final multipartFile = http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: filename,
-      );
-      request.files.add(multipartFile);
+      final fileExt = filename.split('.').last.toLowerCase();
+      final fileName =
+          '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
-      print('Image upload (bytes) POST to: $uri');
-      print('Image upload (bytes) request fields: ' + request.fields.toString());
-      final streamed = await request.send();
-      final resp = await http.Response.fromStream(streamed);
-      print('Image upload (bytes) POST ${resp.statusCode}: ${resp.body}');
+      await _client.storage
+          .from(bucketName)
+          .uploadBinary(
+            fileName,
+            bytes,
+            fileOptions: FileOptions(
+              contentType: _getContentType(fileExt),
+              upsert: false,
+            ),
+          );
 
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        try {
-          final decoded = jsonDecode(resp.body);
-          if (decoded is Map && decoded.containsKey('url')) {
-            return decoded['url'] as String;
-          }
-          if (decoded is String) return decoded;
-        } catch (_) {
-          return resp.body;
-        }
-        return resp.body;
-      }
-
-      throw Exception('Image upload failed: ${resp.statusCode} ${resp.body}');
+      final imageUrl = _client.storage.from(bucketName).getPublicUrl(fileName);
+      print('Image (bytes) uploaded to Supabase: $imageUrl');
+      return imageUrl;
     } catch (e) {
       print('uploadImageBytes error: $e');
       rethrow;
     }
   }
 
-  // Upload multiple images sequentially and return the list of URLs
+  // Upload multiple images sequentially
   Future<List<String>> uploadMultipleImages(
     List<File> imageFiles,
     String folder,
@@ -115,7 +90,8 @@ class ImageUploadService {
         results.add(url);
       } catch (e) {
         print('Failed to upload image ${f.path}: $e');
-        results.add('/placeholder.svg?height=200&width=300');
+        // Use empty string or throw - don't add placeholder
+        rethrow;
       }
     }
     return results;
@@ -134,20 +110,82 @@ class ImageUploadService {
         results.add(url);
       } catch (e) {
         print('Failed to upload image bytes[$i]: $e');
-        results.add('/placeholder.svg?height=200&width=300');
+        rethrow;
       }
     }
     return results;
   }
 
-  // Test storage connection
-  Future<bool> testStorageConnection() async {
-    // Optionally, we could call a lightweight health endpoint. For now, assume true.
-    return true;
+  // Map folder names to Supabase bucket names
+  String _getBucketName(String folder) {
+    switch (folder.toLowerCase()) {
+      case 'profiles':
+      case 'avatars':
+        return 'avatars';
+      case 'listings':
+      case 'rooms':
+        return 'listings';
+      default:
+        return 'listings'; // default bucket
+    }
   }
 
-  // Delete image (optional) - depends on backend API
+  // Get content type from file extension
+  String _getContentType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      case 'avi':
+        return 'video/x-msvideo';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // Test storage connection
+  Future<bool> testStorageConnection() async {
+    try {
+      // Try to list files (won't fail even if empty)
+      await _client.storage.from('avatars').list();
+      return true;
+    } catch (e) {
+      print('Storage connection test failed: $e');
+      return false;
+    }
+  }
+
+  // Delete image
   Future<void> deleteImage(String imageUrl) async {
-    // TODO: Implement if backend exposes a delete endpoint
+    try {
+      // Extract bucket and path from URL
+      final uri = Uri.parse(imageUrl);
+      final pathSegments = uri.pathSegments;
+
+      // URL format: .../storage/v1/object/public/{bucket}/{path}
+      if (pathSegments.contains('object') && pathSegments.contains('public')) {
+        final bucketIndex = pathSegments.indexOf('public') + 1;
+        if (bucketIndex < pathSegments.length) {
+          final bucket = pathSegments[bucketIndex];
+          final filePath = pathSegments.sublist(bucketIndex + 1).join('/');
+
+          await _client.storage.from(bucket).remove([filePath]);
+          print('Deleted image: $filePath from bucket: $bucket');
+        }
+      }
+    } catch (e) {
+      print('Delete image error: $e');
+      // Don't rethrow - deletion failures are not critical
+    }
   }
 }

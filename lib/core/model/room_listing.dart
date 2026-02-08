@@ -14,6 +14,7 @@ class RoomListingModel {
   final String gender; // 'male', 'female', 'any'
   final DateTime availableFrom;
   final bool isActive;
+  final String school;
 
   RoomListingModel({
     required this.id,
@@ -31,6 +32,7 @@ class RoomListingModel {
     required this.gender,
     required this.availableFrom,
     this.isActive = true,
+    required this.school,
   });
 
   factory RoomListingModel.fromJson(Map<String, dynamic> json) {
@@ -63,6 +65,7 @@ class RoomListingModel {
               ? DateTime.parse(json['available_from'])
               : DateTime.now(),
       isActive: json['is_active'] ?? json['isActive'] ?? true,
+      school: json['school'] ?? '',
     );
   }
 
@@ -83,6 +86,7 @@ class RoomListingModel {
       'gender_preference': gender,
       'available_from': availableFrom.toIso8601String(),
       'is_active': isActive,
+      'school': school,
     };
   }
 }

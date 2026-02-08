@@ -61,7 +61,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       if (result['success'] == true) {
-        state = state.copyWith(user: result['user'], isLoading: false);
+        if (result['emailConfirmationRequired'] == true) {
+          // Do not set user state yet
+          state = state.copyWith(isLoading: false);
+        } else {
+          state = state.copyWith(user: result['user'], isLoading: false);
+        }
       } else {
         state = state.copyWith(error: result['error'], isLoading: false);
       }
@@ -104,6 +109,44 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(error: e.toString(), isLoading: false);
       return errorMap;
     }
+  }
+
+  /// ✅ RESET PASSWORD
+  Future<Map<String, dynamic>> resetPassword(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await _authService.resetPassword(email: email);
+      state = state.copyWith(isLoading: false);
+      if (result['success'] != true) {
+        state = state.copyWith(error: result['error']);
+      }
+      return result;
+    } catch (e) {
+      final errorMap = {'success': false, 'error': e.toString()};
+      state = state.copyWith(error: e.toString(), isLoading: false);
+      return errorMap;
+    }
+  }
+
+  /// 🛠️ BYPASS LOGIN (DEV ONLY)
+  Future<void> loginBypass() async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    final dummyUser = UserModel(
+      id: 'dummy_user_123',
+      name: 'Guest User',
+      email: 'guest@campnest.com',
+      school: 'CampNest University',
+      age: 21,
+      gender: 'other',
+      profileImage: null,
+      preferences: [],
+    );
+
+    state = state.copyWith(user: dummyUser, isLoading: false);
   }
 
   /// ✅ VERIFY OTP
@@ -152,6 +195,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signOut() async {
     await _authService.signOut();
     state = AuthState();
+  }
+
+  /// ❌ DELETE ACCOUNT
+  Future<void> deleteAccount() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _authService.deleteAccount();
+      state = AuthState(); // Reset state
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+      rethrow;
+    }
   }
 
   /// 🧩 Setters for local changes

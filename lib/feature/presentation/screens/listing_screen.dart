@@ -1,9 +1,6 @@
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
-import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
-import 'package:camp_nest/core/model/room_listing.dart';
-import 'package:camp_nest/core/service/listing_service.dart';
-import 'package:camp_nest/feature/presentation/screens/post_listing_screen.dart';
 import 'package:camp_nest/feature/presentation/widget/roomcard.dart';
+import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,36 +12,52 @@ class ListingsScreen extends ConsumerStatefulWidget {
 }
 
 class _ListingsScreenState extends ConsumerState<ListingsScreen> {
-  // Price slider bounds. Use a high top value and interpret top as 'no max filter'.
-  final double _priceMin = 200;
-  final double _priceMax = 200000;
-  double _maxPrice = 200000;
+  // Price slider bounds
+  final double _priceMin = 0; // Changed to allow 0
+  final double _priceMax = 2000;
+  double _maxPrice = 2000;
   String _selectedGender = 'any';
   String _searchLocation = '';
-  List<RoomListingModel>? _searchResults;
-  bool _isSearching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyFilters();
+    });
+  }
+
+  void _applyFilters() {
+    // Call the provider to load listings with current filters
+    ref
+        .read(searchListingsProvider.notifier)
+        .loadListings(
+          maxPrice: _maxPrice < _priceMax ? _maxPrice : null,
+          location: _searchLocation.isNotEmpty ? _searchLocation : null,
+          genderPreference: _selectedGender != 'any' ? _selectedGender : null,
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final listingsState = ref.watch(listingsProvider);
-    final filteredListings =
-        _searchResults ??
-        ref
-            .read(listingsProvider.notifier)
-            .filterListings(
-              maxPrice: _maxPrice,
-              gender: _selectedGender == 'any' ? null : _selectedGender,
-              location: _searchLocation.isEmpty ? null : _searchLocation,
-            );
+    // Watch the provider for changes
+    final listingsState = ref.watch(searchListingsProvider);
+    final _isLoading = listingsState.isLoading;
+    final _filteredListings = listingsState.listings; // Using real data
 
     return Scaffold(
-      // appBar: AppBar(leading: BackButton()),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final w = constraints.maxWidth;
           final isTablet = w >= 600 && w < 1024;
           final isDesktop = w >= 1024;
-          final horizontalPadding = isDesktop ? 24.0 : isTablet ? 20.0 : 16.0;
+          final horizontalPadding =
+              isDesktop
+                  ? 24.0
+                  : isTablet
+                  ? 20.0
+                  : 16.0;
           const maxContentWidth = 1200.0;
 
           return SafeArea(
@@ -56,123 +69,158 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                   child: CustomScrollView(
                     scrollDirection: Axis.vertical,
                     slivers: [
-          // App Bar
-          SliverAppBar(
-            // leading: BackButton(),
-            title: const Text('Room Listings'),
-            floating: true,
-            snap: true,
-            actions: [
-              IconButton(
-                onPressed: _showFilters,
-                icon: const Icon(Icons.filter_list),
-              ),
-              IconButton(
-                onPressed:
-                    () => ref.read(listingsProvider.notifier).loadListings(),
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
+                      // App Bar
+                      SliverAppBar(
+                        // leading: BackButton(),
+                        title: Text(
+                          'Room Listings',
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        floating: true,
+                        snap: true,
+                        backgroundColor: Colors.transparent,
+                        surfaceTintColor: Colors.transparent,
+                        actions: [
+                          IconButton(
+                            onPressed: _showFilters,
+                            icon: const Icon(Icons.filter_list_rounded),
+                          ),
+                          IconButton(
+                            onPressed: _applyFilters,
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                        ],
+                      ),
 
-          // Search bar
-          SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverToBoxAdapter(
-              child: TextField(
-                decoration: const InputDecoration(
-                  hintText: 'Search by location...',
-                  prefixIcon: Icon(Icons.search),
-                ),
-                onChanged: (value) {
-                  setState(() {
-                    _searchLocation = value;
-                  });
-                  print('ListingScreen: search input changed -> "${value}"');
-                },
-              ),
-            ),
-          ),
+                      // Search bar
+                      SliverPadding(
+                        padding: const EdgeInsets.all(16),
+                        sliver: SliverToBoxAdapter(
+                          child: FadeInSlide(
+                            duration: 0.5,
+                            child: TextField(
+                              decoration: InputDecoration(
+                                hintText: 'Search by location...',
+                                prefixIcon: const Icon(Icons.search_rounded),
+                                suffixIcon:
+                                    _searchLocation.isNotEmpty
+                                        ? IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          onPressed: () {
+                                            setState(() {
+                                              _searchLocation = '';
+                                              _applyFilters();
+                                            });
+                                          },
+                                        )
+                                        : null,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 16,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.withOpacity(0.3),
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey.withOpacity(0.3),
+                                  ),
+                                ),
+                                filled: true,
+                                fillColor: Theme.of(context).cardColor,
+                              ),
+                              onChanged: (value) {
+                                setState(() {
+                                  _searchLocation = value;
+                                });
+                                _applyFilters();
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
 
-          // Listings content
-          if (_isSearching)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (listingsState.isLoading && _searchResults == null)
-            const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (listingsState.error != null)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Error: ${listingsState.error}'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed:
-                          () =>
-                              ref
-                                  .read(listingsProvider.notifier)
-                                  .loadListings(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else if (filteredListings.isEmpty)
-            const SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.home_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 16),
-                    Text('No rooms found'),
-                    Text('Try adjusting your filters'),
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: RoomCard(listing: filteredListings[index]),
-                  );
-                }, childCount: filteredListings.length),
-              ),
-            ),
+                      // Listings content
+                      if (_isLoading)
+                        const SliverFillRemaining(
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_filteredListings.isEmpty)
+                        SliverFillRemaining(
+                          child: Center(
+                            child: FadeInSlide(
+                              duration: 0.5,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.home_work_outlined,
+                                    size: 64,
+                                    color: Colors.grey[400],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No rooms found',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _maxPrice = 2000;
+                                        _selectedGender = 'any';
+                                        _searchLocation = '';
+                                        _applyFilters();
+                                      });
+                                    },
+                                    child: const Text('Clear Filters'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: FadeInSlide(
+                                  duration: 0.5,
+                                  delay: index * 0.1,
+                                  child: RoomCard(
+                                    listing: _filteredListings[index],
+                                  ),
+                                ),
+                              );
+                            }, childCount: _filteredListings.length),
+                          ),
+                        ),
 
-          // Bottom padding for FAB
-          const SliverPadding(padding: EdgeInsets.only(bottom: 100)),
-        ],
-      ),
+                      // Bottom padding for FAB
+                      const SliverPadding(
+                        padding: EdgeInsets.only(bottom: 100),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           );
         },
       ),
-
-      // Floating Action Button for post creation
-      // floatingActionButton: FloatingActionButton.extended(
-      //   onPressed: () {
-      //     Navigator.of(context).push(
-      //       MaterialPageRoute(builder: (context) => const PostListingScreen()),
-      //     );
-      //   },
-      //   icon: const Icon(Icons.add),
-      //   label: const Text('Post Room'),
-      //   backgroundColor: Theme.of(context).colorScheme.primary,
-      //   foregroundColor: Colors.white,
-      // ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
@@ -181,6 +229,10 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
       builder:
           (context) => StatefulBuilder(
             builder:
@@ -190,23 +242,35 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Filters',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
+                      // Handle bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
 
                       Text(
+                        'Filters',
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 24),
+
+                      Text(
                         'Max Price: ${_maxPrice >= _priceMax ? 'No max' : '\$${_maxPrice.round()}'}',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
                       Slider(
                         value: _maxPrice,
                         min: _priceMin,
                         max: _priceMax,
-                        divisions: 100,
+                        divisions: 20,
                         onChanged: (value) {
                           setModalState(() {
                             _maxPrice = value;
@@ -216,19 +280,23 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
 
                       const SizedBox(height: 16),
 
-                      const Text('Gender Preference'),
-                      const SizedBox(height: 8),
+                      const Text(
+                        'Gender Preference',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 12),
                       Wrap(
                         spacing: 8,
                         children:
                             ['any', 'male', 'female'].map((gender) {
-                              return ChoiceChip(
+                              final isSelected = _selectedGender == gender;
+                              return FilterChip(
                                 label: Text(
                                   gender == 'any'
                                       ? 'Any'
                                       : gender.toUpperCase(),
                                 ),
-                                selected: _selectedGender == gender,
+                                selected: isSelected,
                                 onSelected: (selected) {
                                   if (selected) {
                                     setModalState(() {
@@ -236,11 +304,25 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                                     });
                                   }
                                 },
+                                selectedColor: Theme.of(
+                                  context,
+                                ).primaryColor.withOpacity(0.2),
+                                checkmarkColor: Theme.of(context).primaryColor,
+                                labelStyle: TextStyle(
+                                  color:
+                                      isSelected
+                                          ? Theme.of(context).primaryColor
+                                          : null,
+                                  fontWeight:
+                                      isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                ),
                               );
                             }).toList(),
                       ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 32),
 
                       Row(
                         children: [
@@ -248,7 +330,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                             child: OutlinedButton(
                               onPressed: () {
                                 setModalState(() {
-                                  _maxPrice = 1000;
+                                  _maxPrice = 2000;
                                   _selectedGender = 'any';
                                   _searchLocation = '';
                                 });
@@ -259,71 +341,20 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: () async {
-                                // Perform search locally so Home/global listings aren't modified
+                              onPressed: () {
                                 setState(() {
-                                  _isSearching = true;
-                                  _searchResults = null;
+                                  _maxPrice = _maxPrice;
+                                  _selectedGender = _selectedGender;
                                 });
-
-                                try {
-                                  final service = ref.read(
-                                    listingsServiceProvider,
-                                  );
-                                  final maxPriceParam =
-                                      _maxPrice >= _priceMax ? null : _maxPrice;
-                                  print(
-                                    'ListingScreen: starting search with location="${_searchLocation.isEmpty ? '' : _searchLocation}", maxPrice=$maxPriceParam, gender=${_selectedGender}',
-                                  );
-                                  final results = await service.searchListings(
-                                    location:
-                                        _searchLocation.isEmpty
-                                            ? null
-                                            : _searchLocation,
-                                    minPrice: null,
-                                    maxPrice: maxPriceParam,
-                                    genderPreference:
-                                        _selectedGender == 'any'
-                                            ? null
-                                            : _selectedGender,
-                                    page: 0,
-                                    size: 50,
-                                  );
-
-                                  print(
-                                    'ListingScreen: search completed, results count=${results.length}',
-                                  );
-                                  if (results.isNotEmpty) {
-                                    final sample =
-                                        results
-                                            .take(5)
-                                            .map((r) => r.title)
-                                            .toList();
-                                    print(
-                                      'ListingScreen: sample titles=${sample}',
-                                    );
-                                  }
-
-                                  setState(() {
-                                    _searchResults = results;
-                                  });
-                                } catch (e) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Search failed: ${e.toString()}',
-                                      ),
-                                    ),
-                                  );
-                                } finally {
-                                  setState(() {
-                                    _isSearching = false;
-                                  });
-                                }
-
+                                _applyFilters();
                                 Navigator.pop(context);
                               },
-                              child: const Text('Apply'),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: const Text('Apply Filters'),
                             ),
                           ),
                         ],

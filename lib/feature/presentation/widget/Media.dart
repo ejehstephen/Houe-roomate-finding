@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
@@ -5,9 +6,21 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:camp_nest/core/service/auth_service.dart';
 
 class MediaDisplayWidget extends StatefulWidget {
-  final String mediaUrl;
+  final String? mediaUrl;
+  final File? file;
+  final bool isThumbnail;
+  final BoxFit fit;
 
-  const MediaDisplayWidget({super.key, required this.mediaUrl});
+  const MediaDisplayWidget({
+    super.key,
+    this.mediaUrl,
+    this.file,
+    this.isThumbnail = false,
+    this.fit = BoxFit.cover,
+  }) : assert(
+         mediaUrl != null || file != null,
+         'Either mediaUrl or file must be provided',
+       );
 
   @override
   _MediaDisplayWidgetState createState() => _MediaDisplayWidgetState();
@@ -26,7 +39,9 @@ class _MediaDisplayWidgetState extends State<MediaDisplayWidget> {
 
   @override
   void didUpdateWidget(covariant MediaDisplayWidget oldWidget) {
-    if (widget.mediaUrl != oldWidget.mediaUrl) {
+    if (widget.mediaUrl != oldWidget.mediaUrl ||
+        widget.file != oldWidget.file ||
+        widget.isThumbnail != oldWidget.isThumbnail) {
       _disposeControllers();
       _initializeMedia();
     }
@@ -48,26 +63,48 @@ class _MediaDisplayWidgetState extends State<MediaDisplayWidget> {
   }
 
   void _initializeMedia() async {
-    final resolvedUrl =
-        widget.mediaUrl.startsWith('http')
-            ? widget.mediaUrl
-            : '${AuthService().baseUrl}${widget.mediaUrl}';
+    if (widget.file != null) {
+      final path = widget.file!.path.toLowerCase();
+      if (path.endsWith('.mp4') ||
+          path.endsWith('.mov') ||
+          path.endsWith('.avi')) {
+        try {
+          _videoController = VideoPlayerController.file(widget.file!);
+          await _videoController!.initialize();
+          if (mounted) {
+            setState(() {
+              _setupControllers();
+              _isInitialized = true;
+            });
+          }
+        } catch (e) {
+          if (mounted) setState(() => _isInitialized = true);
+        }
+      } else {
+        if (mounted) setState(() => _isInitialized = true);
+      }
+      return;
+    }
 
-    // Handle Video - Check this first to avoid passing it to Image.network
+    final resolvedUrl =
+        widget.mediaUrl != null && widget.mediaUrl!.startsWith('http')
+            ? widget.mediaUrl!
+            : '${AuthService().baseUrl}${widget.mediaUrl ?? ""}';
+
+    // Handle Video
     if (resolvedUrl.toLowerCase().endsWith('.mp4') ||
-        resolvedUrl.contains('/video/')) {
+        resolvedUrl.contains('/video/') ||
+        resolvedUrl.contains('.mov') ||
+        resolvedUrl.contains('.avi')) {
       try {
         _videoController = VideoPlayerController.networkUrl(
           Uri.parse(resolvedUrl),
         );
         await _videoController!.initialize();
+
         if (mounted) {
           setState(() {
-            _chewieController = ChewieController(
-              videoPlayerController: _videoController!,
-              autoPlay: true,
-              looping: false,
-            );
+            _setupControllers();
             _isInitialized = true;
           });
         }
@@ -80,67 +117,171 @@ class _MediaDisplayWidgetState extends State<MediaDisplayWidget> {
         print('Error initializing video: $e');
       }
     } else {
-      if (mounted) {
-        // Add a mounted check here as well for consistency
-        setState(() {
-          _isInitialized = true;
-        });
-      } // Exit here after handling video logic
-    }
-
-    // Handle SVG
-    if (resolvedUrl.toLowerCase().endsWith('.svg')) {
+      // Images/SVG
       if (mounted) {
         setState(() {
           _isInitialized = true;
         });
       }
-      return; // Exit here after handling SVG
     }
+  }
 
-    // For images, no controller needed. Mark as initialized.
-    if (mounted) {
-      setState(() {
-        _isInitialized = true;
-      });
+  void _setupControllers() {
+    if (widget.isThumbnail) {
+      // Just initialize, don't play
+      _videoController!.setVolume(0);
+    } else {
+      _chewieController = ChewieController(
+        videoPlayerController: _videoController!,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: _videoController!.value.aspectRatio,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Text(
+              errorMessage,
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        },
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        color: Colors.grey[200],
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Handle File rendering
+    if (widget.file != null) {
+      if (_videoController != null && _videoController!.value.isInitialized) {
+        if (widget.isThumbnail) {
+          return ClipRect(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                FittedBox(
+                  fit: widget.fit,
+                  child: SizedBox(
+                    width: _videoController!.value.size.width,
+                    height: _videoController!.value.size.height,
+                    child: VideoPlayer(_videoController!),
+                  ),
+                ),
+                Container(
+                  color: Colors.black26,
+                  child: const Center(
+                    child: Icon(
+                      Icons.play_circle_fill,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (_chewieController != null) {
+          return ClipRect(
+            child: FittedBox(
+              fit: widget.fit,
+              child: SizedBox(
+                width: _videoController!.value.size.width,
+                height: _videoController!.value.size.height,
+                child: Chewie(controller: _chewieController!),
+              ),
+            ),
+          );
+        }
+        return const Center(child: Icon(Icons.videocam_off, size: 50));
+      }
+
+      // File Image
+      return Image.file(
+        widget.file!,
+        fit: widget.fit,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder:
+            (context, error, stackTrace) =>
+                const Center(child: Icon(Icons.error, size: 50)),
+      );
     }
 
     final resolvedUrl =
-        widget.mediaUrl.startsWith('http')
-            ? widget.mediaUrl
-            : '${AuthService().baseUrl}${widget.mediaUrl}';
+        widget.mediaUrl != null && widget.mediaUrl!.startsWith('http')
+            ? widget.mediaUrl!
+            : '${AuthService().baseUrl}${widget.mediaUrl ?? ""}';
 
-    // Explicitly check for video again in the build method
+    // Handle Video
     if (resolvedUrl.toLowerCase().endsWith('.mp4') ||
-        resolvedUrl.contains('/video/')) {
-      if (_chewieController != null &&
-          _chewieController!.videoPlayerController.value.isInitialized) {
-        return Chewie(controller: _chewieController!);
+        resolvedUrl.contains('/video/') ||
+        resolvedUrl.contains('.mov') ||
+        resolvedUrl.contains('.avi')) {
+      if (_videoController != null && _videoController!.value.isInitialized) {
+        if (widget.isThumbnail) {
+          return ClipRect(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                FittedBox(
+                  fit: widget.fit,
+                  child: SizedBox(
+                    width: _videoController!.value.size.width,
+                    height: _videoController!.value.size.height,
+                    child: VideoPlayer(_videoController!),
+                  ),
+                ),
+                Container(
+                  color: Colors.black26,
+                  child: const Center(
+                    child: Icon(
+                      Icons.play_circle_fill,
+                      size: 48,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ClipRect(
+          child: FittedBox(
+            fit: widget.fit,
+            child: SizedBox(
+              width: _videoController!.value.size.width,
+              height: _videoController!.value.size.height,
+              child: Chewie(controller: _chewieController!),
+            ),
+          ),
+        );
       }
       return const Center(child: Icon(Icons.videocam_off, size: 50));
     }
 
-    // Explicitly check for SVG
+    // Handle SVG
     if (resolvedUrl.toLowerCase().endsWith('.svg')) {
       return SvgPicture.network(
         resolvedUrl,
-        fit: BoxFit.cover,
+        fit: widget.fit,
         width: double.infinity,
         height: double.infinity,
       );
     }
 
-    // Default to Image.network for standard images
+    // Default to Image.network
     return Image.network(
       resolvedUrl,
-      fit: BoxFit.cover,
+      fit: widget.fit,
       width: double.infinity,
       height: double.infinity,
       loadingBuilder: (context, child, loadingProgress) {

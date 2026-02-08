@@ -1,182 +1,173 @@
-// import 'package:cached_network_image/cached_network_image.dart';
-// import 'package:camp_nest/core/service/auth_service.dart';
 import 'package:camp_nest/feature/presentation/widget/Media.dart';
-// import 'package:flutter_svg/flutter_svg.dart';
 import 'package:camp_nest/core/model/room_listing.dart';
-import 'package:camp_nest/core/model/user_model.dart';
 import 'package:camp_nest/feature/presentation/screens/roomate_detailed.dart';
-import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-// import 'dart:io';
-// import 'package:video_player/video_player.dart';
-// import 'package:chewie/chewie.dart';
 
-class RoomCard extends StatefulWidget {
+class RoomCard extends StatelessWidget {
   final RoomListingModel listing;
 
   const RoomCard({super.key, required this.listing});
 
   @override
-  State<RoomCard> createState() => _RoomCardState();
-}
-
-class _RoomCardState extends State<RoomCard> {
-  @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => RoomDetailScreen(listing: widget.listing),
-            ),
-          );
-        },
-        child: SizedBox(
-          height: 390, // Fixed height to prevent overflow
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => RoomDetailScreen(listing: listing),
+              ),
+            );
+          },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Image with CachedNetworkImage
-              Container(
-                height: 250, // Fixed image height
+              // Image Section
+              SizedBox(
+                height: 320,
                 width: double.infinity,
-                child:
-                    widget.listing.images.isNotEmpty
-                        ? MediaDisplayWidget(
-                          mediaUrl: widget.listing.images.first,
-                        )
-                        : _buildPlaceholder(),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child:
+                          listing.images.isNotEmpty
+                              ? MediaDisplayWidget(
+                                mediaUrl: listing.images.first,
+                                isThumbnail: true,
+                                fit: BoxFit.cover,
+                              )
+                              : _buildPlaceholder(context),
+                    ),
+                    Positioned(
+                      bottom: 12,
+                      right: 12,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          'N${listing.price.toInt()}/yr',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
 
-              // Content - Fixed height to prevent overflow
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Title and price
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.listing.title,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            '\N${widget.listing.price.toInt()}/yr',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                          ),
-                        ],
+              // Content Section
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      listing.title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-
-                      const SizedBox(height: 6),
-
-                      // Location
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 12,
-                            color: Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              widget.listing.location,
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 17,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // Owner Profile Section removed from RoomCard
-
-                      // Amenities - Show only top 2 with smaller chips
-                      if (widget.listing.amenities.isNotEmpty)
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 2,
-                          children:
-                              widget.listing.amenities.take(2).map((amenity) {
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    amenity,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: Colors.grey[400],
                         ),
-
-                      // const Spacer(), // Push gender preference to bottom
-                      // Gender preference
-                      const SizedBox(height: 15),
-                      Row(
-                        children: [
-                          Icon(
-                            widget.listing.gender == 'male'
-                                ? Icons.male
-                                : widget.listing.gender == 'female'
-                                ? Icons.female
-                                : Icons.people,
-                            size: 17,
-                            color: Colors.grey[600],
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            listing.location,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.grey[400]),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              widget.listing.gender == 'any'
-                                  ? 'Any gender'
-                                  : '${widget.listing.gender.toUpperCase()} only',
-                              style: TextStyle(
-                                fontSize: 17,
-                                color: Colors.grey[600],
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                    // const SizedBox(height: 12),
+                    // Wrap(
+                    //   spacing: 8,
+                    //   runSpacing: 8,
+                    //   children:
+                    //       listing.amenities.take(3).map((amenity) {
+                    //         return Container(
+                    //           padding: const EdgeInsets.symmetric(
+                    //             horizontal: 8,
+                    //             vertical: 4,
+                    //           ),
+                    //           decoration: BoxDecoration(
+                    //             color:
+                    //                 Theme.of(
+                    //                   context,
+                    //                 ).colorScheme.surfaceContainerHighest,
+                    //             borderRadius: BorderRadius.circular(6),
+                    //           ),
+                    //           child: Text(
+                    //             amenity,
+                    //             style: TextStyle(
+                    //               fontSize: 12,
+                    //               color:
+                    //                   Theme.of(
+                    //                     context,
+                    //                   ).colorScheme.onSurfaceVariant,
+                    //             ),
+                    //           ),
+                    //         );
+                    //       }).toList(),
+                    // ),
+                    // const SizedBox(height: 12),
+                    // Row(
+                    //   children: [
+                    //     Icon(
+                    //       listing.gender == 'male'
+                    //           ? Icons.male
+                    //           : listing.gender == 'female'
+                    //           ? Icons.female
+                    //           : Icons.people_outline,
+                    //       size: 16,
+                    //       color: Colors.grey[600],
+                    //     ),
+                    //     const SizedBox(width: 4),
+                    //     Text(
+                    //       listing.gender == 'any'
+                    //           ? 'Any gender'
+                    //           : '${listing.gender[0].toUpperCase()}${listing.gender.substring(1)}',
+                    //       style: TextStyle(
+                    //         color: Colors.grey[600],
+                    //         fontSize: 13,
+                    //       ),
+                    //     ),
+                    //   ],
+                    // ),
+                  ],
                 ),
               ),
             ],
@@ -186,18 +177,16 @@ class _RoomCardState extends State<RoomCard> {
     );
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildPlaceholder(BuildContext context) {
     return Container(
       color: Colors.grey[200],
       child: Center(
         child: Icon(
-          Icons.image_not_supported,
-          size: 50,
+          Icons.image_not_supported_outlined,
+          size: 48,
           color: Colors.grey[400],
         ),
       ),
     );
   }
-
-  // Helper method removed
 }

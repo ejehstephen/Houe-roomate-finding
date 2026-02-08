@@ -1,5 +1,6 @@
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/service/listing_service.dart';
+import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ListingsState {
@@ -24,8 +25,10 @@ class ListingsState {
 
 class ListingsNotifier extends StateNotifier<ListingsState> {
   final ListingsService _listingsService;
+  final String? _userSchool;
 
-  ListingsNotifier(this._listingsService) : super(ListingsState());
+  ListingsNotifier(this._listingsService, this._userSchool)
+    : super(ListingsState());
 
   Future<void> loadListings({
     double? maxPrice,
@@ -34,7 +37,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     double? minPrice,
     int page = 0,
     int size = 10,
-    String sort = 'createdAt',
+    String sort = 'created_at',
     String order = 'desc',
   }) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -49,9 +52,12 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
         size: size,
         sort: sort,
         order: order,
+        school: _userSchool,
       );
+      if (!mounted) return;
       state = state.copyWith(listings: listings, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
@@ -64,11 +70,10 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
       print('ListingsNotifier.addListing - listing.rules: ${listing.rules}');
 
       final newListing = await _listingsService.createListing(listing: listing);
+      if (!mounted) return;
+
       if (newListing != null) {
-        // If backend didn't persist ownerPhone or whatsappLink, fall back to the
-        // values provided in the original listing (from the post form).
-        // If backend didn't provide a whatsappLink but returned ownerPhone,
-        // construct a wa.me link client-side so the UI can open WhatsApp.
+        // ... (logic for whatsapp link fallback) ...
         String? clientWhatsapp =
             newListing.whatsappLink ?? listing.whatsappLink;
         if ((clientWhatsapp == null || clientWhatsapp.isEmpty) &&
@@ -100,14 +105,12 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
               newListing.amenities.isNotEmpty
                   ? newListing.amenities
                   : listing.amenities,
-          // If backend returned an empty rules list for some reason, fall
-          // back to the client-provided rules so the listing shows what the
-          // user actually entered in the post form.
           rules:
               (newListing.rules.isNotEmpty) ? newListing.rules : listing.rules,
           gender: newListing.gender,
           availableFrom: newListing.availableFrom,
           isActive: newListing.isActive,
+          school: newListing.school,
         );
 
         // Prepend the new listing so it appears at the top of the list immediately
@@ -117,6 +120,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);
       rethrow; // Re-throw so the UI can handle it
     }
@@ -125,13 +129,18 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
   Future<void> updateListing(RoomListingModel listing) async {
     try {
       final updatedListing = await _listingsService.updateListing(listing);
-      final updatedListings =
-          state.listings.map((l) {
-            return l.id == updatedListing.id ? updatedListing : l;
-          }).toList();
+      if (!mounted) return;
 
-      state = state.copyWith(listings: updatedListings);
+      if (updatedListing != null) {
+        final updatedListings =
+            state.listings.map((l) {
+              return l.id == updatedListing.id ? updatedListing : l;
+            }).toList();
+
+        state = state.copyWith(listings: updatedListings);
+      }
     } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(error: e.toString());
     }
   }
@@ -140,10 +149,13 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await _listingsService.deleteListing(listingId);
+      if (!mounted) return;
+
       final updatedListings =
           state.listings.where((l) => l.id != listingId).toList();
       state = state.copyWith(listings: updatedListings, isLoading: false);
     } catch (e) {
+      if (!mounted) return;
       // don't persist the error into global listings state (that hides the list);
       // let callers handle the error so they can show context-appropriate UI.
       state = state.copyWith(isLoading: false);
@@ -155,9 +167,26 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
   Future<void> loadAllListings() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final listings = await _listingsService.getAllListings();
+      final listings = await _listingsService.getAllListings(
+        school: _userSchool,
+      );
+      if (!mounted) return;
       state = state.copyWith(listings: listings, isLoading: false, error: null);
     } catch (e) {
+      if (!mounted) return;
+      state = state.copyWith(error: e.toString(), isLoading: false);
+    }
+  }
+
+  /// Load only listings owned by the current user
+  Future<void> loadMyListings() async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final listings = await _listingsService.getMyListings();
+      if (!mounted) return;
+      state = state.copyWith(listings: listings, isLoading: false, error: null);
+    } catch (e) {
+      if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
   }
@@ -191,6 +220,19 @@ final listingsServiceProvider = Provider<ListingsService>(
 
 final listingsProvider = StateNotifierProvider<ListingsNotifier, ListingsState>(
   (ref) {
-    return ListingsNotifier(ref.read(listingsServiceProvider));
+    final authState = ref.watch(authProvider);
+    return ListingsNotifier(
+      ref.read(listingsServiceProvider),
+      authState.user?.school,
+    );
   },
 );
+
+final searchListingsProvider =
+    StateNotifierProvider.autoDispose<ListingsNotifier, ListingsState>((ref) {
+      final authState = ref.watch(authProvider);
+      return ListingsNotifier(
+        ref.read(listingsServiceProvider),
+        authState.user?.school,
+      );
+    });
