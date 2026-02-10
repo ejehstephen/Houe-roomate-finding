@@ -27,6 +27,21 @@ CREATE POLICY "Users can update own notifications"
 ON notifications FOR UPDATE 
 USING (auth.uid() = user_id);
 
+-- Policy: Users can delete their own notifications
+CREATE POLICY "Users can delete own notifications" 
+ON notifications FOR DELETE 
+USING (auth.uid() = user_id);
+
+-- Policy: Admins can insert notifications (e.g. for system events or verification)
+CREATE POLICY "Admins can insert notifications" 
+ON notifications FOR INSERT 
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE id = auth.uid() AND role = 'admin'
+  )
+);
+
 -- Index for fetching user notifications
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 -- Index for unread count

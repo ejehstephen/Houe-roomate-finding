@@ -8,6 +8,9 @@ class UserModel {
   final String gender;
   final String? phoneNumber;
   final List<String> preferences;
+  final String role;
+  final bool isBanned;
+  final bool isVerified;
 
   UserModel({
     required this.id,
@@ -19,6 +22,9 @@ class UserModel {
     required this.gender,
     this.phoneNumber,
     required this.preferences,
+    this.role = 'user',
+    this.isBanned = false,
+    this.isVerified = false,
   });
 
   // ✅ Add copyWith method
@@ -32,6 +38,9 @@ class UserModel {
     String? gender,
     String? phoneNumber,
     List<String>? preferences,
+    String? role,
+    bool? isBanned,
+    bool? isVerified,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -43,6 +52,9 @@ class UserModel {
       gender: gender ?? this.gender,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       preferences: preferences ?? this.preferences,
+      role: role ?? this.role,
+      isBanned: isBanned ?? this.isBanned,
+      isVerified: isVerified ?? this.isVerified,
     );
   }
 
@@ -71,6 +83,9 @@ class UserModel {
           (json['preferences'] is List)
               ? List<String>.from(json['preferences'])
               : [],
+      role: json['role'] ?? 'user',
+      isBanned: json['is_banned'] ?? false,
+      isVerified: json['is_verified'] ?? false,
     );
   }
 
@@ -86,6 +101,9 @@ class UserModel {
       'gender': gender,
       'phone_number': phoneNumber,
       'preferences': preferences,
+      'role': role,
+      'is_banned': isBanned,
+      'is_verified': isVerified,
     };
   }
 

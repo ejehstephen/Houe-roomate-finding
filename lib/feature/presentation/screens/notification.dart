@@ -122,7 +122,9 @@ class NotificationScreen extends ConsumerWidget {
       ),
       direction: DismissDirection.endToStart,
       onDismissed: (_) {
-        // TODO: Implement delete notification
+        ref
+            .read(notificationServiceProvider)
+            .deleteNotification(notification.id);
       },
       child: GestureDetector(
         onTap: () {

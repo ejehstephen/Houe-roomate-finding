@@ -3,7 +3,12 @@ import 'package:flutter/services.dart';
 
 class AppTheme {
   // Premium Color Palette
-  static const Color primaryColor = Color(0xFF4338CA); // Deep Indigo
+  static const Color primaryColor = Color.fromARGB(
+    255,
+    3,
+    102,
+    251,
+  ); // Deep Indigo
   static const Color primaryDark = Color(0xFF312E81);
   static const Color accentColor = Color(0xFFF59E0B); // Amber/Gold
   static const Color backgroundColor = Color(0xFFF9FAFB); // Cool Gray 50

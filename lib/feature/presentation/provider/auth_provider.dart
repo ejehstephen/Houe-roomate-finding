@@ -33,9 +33,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// ✅ Load user from storage if token/session exists
   Future<void> _loadCurrentUser() async {
+    // 1. Fast load from cache
     final user = await _authService.getCurrentUser();
     if (user != null) {
       state = state.copyWith(user: user);
+    }
+
+    // 2. Silent fresh fetch from DB to get latest role/status
+    try {
+      final freshUser = await _authService.refreshCurrentUser();
+      if (freshUser != null) {
+        state = state.copyWith(user: freshUser);
+      }
+    } catch (e) {
+      print('Background user refresh failed: $e');
     }
   }
 
@@ -234,6 +245,82 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
+    }
+  }
+
+  // ========================= OTP-BASED METHODS =========================
+
+  /// ✅ Send OTP for email verification
+  Future<Map<String, dynamic>> sendEmailVerificationOTP(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final result = await _authService.sendEmailVerificationOTP(email);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// ✅ Verify email OTP
+  Future<Map<String, dynamic>> verifyEmailOTP({
+    required String email,
+    required String otp,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final result = await _authService.verifyEmailOTP(email: email, otp: otp);
+
+      if (result['success'] == true && result['user'] != null) {
+        state = state.copyWith(user: result['user'], isLoading: false);
+      } else {
+        state = state.copyWith(isLoading: false, error: result['error']);
+      }
+
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// ✅ Send OTP for password reset
+  Future<Map<String, dynamic>> sendPasswordResetOTP(String email) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final result = await _authService.sendPasswordResetOTP(email);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  /// ✅ Verify OTP and reset password
+  Future<Map<String, dynamic>> verifyOTPAndResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final result = await _authService.verifyOTPAndResetPassword(
+        email: email,
+        otp: otp,
+        newPassword: newPassword,
+      );
+
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return {'success': false, 'error': e.toString()};
     }
   }
 }

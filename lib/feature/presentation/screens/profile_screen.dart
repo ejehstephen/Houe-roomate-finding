@@ -12,6 +12,9 @@ import 'package:camp_nest/feature/presentation/screens/match_screen.dart';
 import 'package:camp_nest/feature/presentation/screens/my_listings_screen.dart';
 import 'package:camp_nest/feature/presentation/screens/settings_screen.dart';
 import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
+import 'package:camp_nest/feature/admin/screens/admin_dashboard.dart';
+import 'package:camp_nest/feature/presentation/provider/verification_provider.dart';
+import 'package:camp_nest/feature/presentation/screens/verification_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -109,6 +112,161 @@ class ProfileScreen extends ConsumerWidget {
                             ),
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        // Verification Status
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final simpleStatus = user?.isVerified == true;
+                            // more detailed status
+                            final verificationAsync = ref.watch(
+                              verificationStatusProvider,
+                            );
+
+                            return verificationAsync.when(
+                              data: (data) {
+                                final status =
+                                    simpleStatus ? 'approved' : data['status'];
+                                final reason = data['rejection_reason'];
+
+                                Color color;
+                                IconData icon;
+                                String text;
+                                VoidCallback? onTap;
+
+                                switch (status) {
+                                  case 'approved':
+                                    color = Colors.green;
+                                    icon = Icons.verified;
+                                    text = 'Identity Verified';
+                                    onTap = null;
+
+                                    // FORCE REFRESH: If local user says unverified but remote says approved, update local
+                                    if (user?.isVerified != true) {
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            ref
+                                                .read(authProvider.notifier)
+                                                .refreshUser();
+                                          });
+                                    }
+                                    break;
+                                  case 'pending':
+                                    color = Colors.orange;
+                                    icon = Icons.access_time_rounded;
+                                    text = 'Verification Pending';
+                                    onTap = null;
+                                    break;
+                                  case 'rejected':
+                                    color = Colors.red;
+                                    icon = Icons.error_outline;
+                                    text = 'Verification Rejected';
+                                    onTap = () {
+                                      // Show reason and allow retry
+                                      showDialog(
+                                        context: context,
+                                        builder:
+                                            (context) => AlertDialog(
+                                              title: const Text(
+                                                'Verification Rejected',
+                                              ),
+                                              content: Text(
+                                                reason ??
+                                                    'Your document was rejected. Please try again.',
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                      ),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                FilledButton(
+                                                  onPressed: () {
+                                                    Navigator.pop(context);
+                                                    Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder:
+                                                            (_) =>
+                                                                const VerificationScreen(),
+                                                      ),
+                                                    );
+                                                  },
+                                                  child: const Text('Retry'),
+                                                ),
+                                              ],
+                                            ),
+                                      );
+                                    };
+                                    break;
+                                  default:
+                                    color = Colors.grey;
+                                    icon = Icons.gpp_bad_outlined;
+                                    text = 'Unverified Identity';
+                                    onTap = () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => const VerificationScreen(),
+                                        ),
+                                      );
+                                    };
+                                }
+
+                                return GestureDetector(
+                                  onTap: onTap,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: color.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: color.withOpacity(0.5),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(icon, size: 16, color: color),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          text,
+                                          style: TextStyle(
+                                            color: color,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        if (onTap != null) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            Icons.arrow_forward_ios,
+                                            size: 10,
+                                            color: color,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                              loading:
+                                  () => const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                              error: (_, __) => const SizedBox.shrink(),
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -130,6 +288,31 @@ class ProfileScreen extends ConsumerWidget {
                                 ?.copyWith(color: Theme.of(context).hintColor),
                           ),
                         ),
+                        if (user?.role == 'admin') ...[
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8, bottom: 8),
+                            // child: Text(
+                            //   'Administration',
+                            //   style: Theme.of(
+                            //     context,
+                            //   ).textTheme.labelLarge?.copyWith(
+                            //     color: Theme.of(context).hintColor,
+                            //   ),
+                            // ),
+                          ),
+                          _ProfileMenuItem(
+                            icon: Icons.admin_panel_settings,
+                            title: 'Admin Dashboard',
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const AdminDashboard(),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                        ],
                         _ProfileMenuItem(
                           icon: Icons.person_outline,
                           title: 'Edit Profile',

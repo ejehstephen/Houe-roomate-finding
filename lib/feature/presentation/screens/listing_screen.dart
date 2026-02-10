@@ -17,7 +17,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
   final double _priceMax = 2000;
   double _maxPrice = 2000;
   String _selectedGender = 'any';
-  String _searchLocation = '';
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -33,7 +33,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
         .read(searchListingsProvider.notifier)
         .loadListings(
           maxPrice: _maxPrice < _priceMax ? _maxPrice : null,
-          location: _searchLocation.isNotEmpty ? _searchLocation : null,
+          query: _searchQuery.isNotEmpty ? _searchQuery : null,
           genderPreference: _selectedGender != 'any' ? _selectedGender : null,
         );
   }
@@ -101,15 +101,16 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                             duration: 0.5,
                             child: TextField(
                               decoration: InputDecoration(
-                                hintText: 'Search by location...',
+                                hintText:
+                                    'Search by title, school, location...',
                                 prefixIcon: const Icon(Icons.search_rounded),
                                 suffixIcon:
-                                    _searchLocation.isNotEmpty
+                                    _searchQuery.isNotEmpty
                                         ? IconButton(
                                           icon: const Icon(Icons.clear),
                                           onPressed: () {
                                             setState(() {
-                                              _searchLocation = '';
+                                              _searchQuery = '';
                                               _applyFilters();
                                             });
                                           },
@@ -136,7 +137,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                               ),
                               onChanged: (value) {
                                 setState(() {
-                                  _searchLocation = value;
+                                  _searchQuery = value;
                                 });
                                 _applyFilters();
                               },
@@ -176,7 +177,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                                       setState(() {
                                         _maxPrice = 2000;
                                         _selectedGender = 'any';
-                                        _searchLocation = '';
+                                        _searchQuery = '';
                                         _applyFilters();
                                       });
                                     },
@@ -332,7 +333,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                                 setModalState(() {
                                   _maxPrice = 2000;
                                   _selectedGender = 'any';
-                                  _searchLocation = '';
+                                  _searchQuery = '';
                                 });
                               },
                               child: const Text('Reset'),

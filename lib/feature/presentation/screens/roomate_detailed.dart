@@ -1,3 +1,4 @@
+// import 'dart:io';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/model/user_model.dart';
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
@@ -74,86 +75,20 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
   }
 
   Future<void> _contactViaWhatsApp() async {
-    final phone = widget.listing.ownerPhone;
-    final backendLink = widget.listing.whatsappLink;
-    final message = Uri.encodeComponent(
-      "Hi! I saw your room listing: ${widget.listing.title}. Can we discuss more details?",
-    );
+    final supportNumber =
+        await ref.read(listingsProvider.notifier).getSupportNumber();
 
-    // 1) Try backend-provided link first
-    if (backendLink != null && backendLink.isNotEmpty) {
-      try {
-        final uri = Uri.parse(backendLink);
-        final launched = await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-        if (launched) return;
-      } catch (e) {
-        print('Error parsing/launching backendLink: $e');
-      }
-    }
+    final message =
+        "Hi CampNest, I'm interested in the listing: ${widget.listing.title} located at ${widget.listing.location} (ID: ${widget.listing.id}). Is it still available?";
+    final url =
+        "https://wa.me/$supportNumber?text=${Uri.encodeComponent(message)}";
 
-    // 2) Build candidate phone formats from ownerPhone
-    if (phone != null && phone.isNotEmpty) {
-      final cleaned = phone.replaceAll(RegExp(r'\D'), '');
-      final candidates = <String>{};
-      if (cleaned.isNotEmpty) candidates.add(cleaned);
-
-      if (cleaned.startsWith('0')) {
-        final withoutZero = cleaned.replaceFirst(RegExp(r'^0+'), '');
-        if (withoutZero.isNotEmpty) {
-          candidates.add(withoutZero);
-          candidates.add('234$withoutZero');
-        }
-      }
-
-      if (cleaned.length <= 10 && !cleaned.startsWith('234')) {
-        candidates.add('234$cleaned');
-      }
-
-      final candidatesWithPlus =
-          candidates.map((c) => c.startsWith('+') ? c : '+$c').toList();
-
-      for (final cand in [...candidates, ...candidatesWithPlus]) {
-        final candDigits = cand.replaceAll(RegExp(r'[^0-9]'), '');
-        final schemes = [
-          Uri.parse('whatsapp://send?phone=$candDigits&text=$message'),
-          Uri.parse('https://wa.me/$candDigits?text=$message'),
-        ];
-
-        for (final uri in schemes) {
-          try {
-            final launched = await launchUrl(
-              uri,
-              mode: LaunchMode.externalApplication,
-            );
-            if (launched) return;
-          } catch (e) {
-            print('Launch error for $cand: $e');
-          }
-        }
-      }
-    }
-
-    // 3) Fallback
-    if (phone != null && phone.isNotEmpty) {
-      await Clipboard.setData(ClipboardData(text: phone));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'WhatsApp not available. Phone number copied to clipboard.',
-            ),
-          ),
-        );
-      }
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No WhatsApp contact available for this listing.'),
-          ),
+          const SnackBar(content: Text('Could not launch WhatsApp')),
         );
       }
     }
@@ -404,6 +339,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                           ),
+                          // Owner Verification Status Badge removed
                           const SizedBox(width: 16),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -518,23 +454,23 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
                                   ),
                                 ),
                                 subtitle: const Text('Listing Owner'),
-                                trailing: IconButton(
-                                  icon: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(
-                                        context,
-                                      ).primaryColor.withOpacity(0.1),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Icon(
-                                      Icons.message_outlined,
-                                      color: Theme.of(context).primaryColor,
-                                      size: 20,
-                                    ),
-                                  ),
-                                  onPressed: _contactViaWhatsApp,
-                                ),
+                                // trailing: IconButton(
+                                //   icon: Container(
+                                //     padding: const EdgeInsets.all(8),
+                                //     decoration: BoxDecoration(
+                                //       color: Theme.of(
+                                //         context,
+                                //       ).primaryColor.withOpacity(0.1),
+                                //       shape: BoxShape.circle,
+                                //     ),
+                                //     child: Icon(
+                                //       Icons.message_outlined,
+                                //       color: Theme.of(context).primaryColor,
+                                //       size: 20,
+                                //     ),
+                                //   ),
+                                //   onPressed: _contactViaWhatsApp,
+                                // ),
                               ),
                     ),
 
@@ -757,24 +693,153 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
       // Bottom Action Bar
       floatingActionButton: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: SizedBox(
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: _contactViaWhatsApp,
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text(
-              'Contact Landlord',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        child: Row(
+          children: [
+            // Report Button
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: TextButton.icon(
+                  onPressed: _showReportDialog,
+                  icon: const Icon(Icons.flag_outlined, color: Colors.red),
+                  label: const Text(
+                    'Report',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    backgroundColor: Colors.red.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
             ),
-            style: ElevatedButton.styleFrom(
-              elevation: 4,
-              shadowColor: Theme.of(context).primaryColor.withOpacity(0.4),
+            const SizedBox(width: 16),
+            // Contact Button
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: _contactViaWhatsApp,
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  label: const Text(
+                    'Contact Us',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    elevation: 4,
+                    shadowColor: Theme.of(
+                      context,
+                    ).primaryColor.withOpacity(0.4),
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+    );
+  }
+
+  void _showReportDialog() {
+    String selectedReason = 'Scam';
+    final TextEditingController detailsController = TextEditingController();
+    final List<String> reasons = [
+      'Scam',
+      'Fake Listing',
+      'Inappropriate Content',
+      'Price is much higher than market rate',
+      'Other',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Report Listing'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Why are you reporting this listing?'),
+                    const SizedBox(height: 16),
+                    ...reasons.map((reason) {
+                      return RadioListTile<String>(
+                        title: Text(reason),
+                        value: reason,
+                        groupValue: selectedReason,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (value) {
+                          setState(() {
+                            selectedReason = value!;
+                          });
+                        },
+                      );
+                    }),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: detailsController,
+                      decoration: const InputDecoration(
+                        labelText: 'Additional Details (Optional)',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    Navigator.pop(ctx);
+                    try {
+                      await ref
+                          .read(listingsProvider.notifier)
+                          .reportListing(
+                            listingId: widget.listing.id,
+                            reason: selectedReason,
+                            details: detailsController.text,
+                          );
+
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('Report submitted. Thank you!'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to report: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'Submit Report',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -789,6 +854,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         Icon(icon, color: Theme.of(context).primaryColor, size: 24),
         const SizedBox(height: 4),
         Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+        const SizedBox(height: 2),
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
       ],
     );

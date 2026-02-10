@@ -1,3 +1,4 @@
+// import 'dart:io';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/service/listing_service.dart';
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
@@ -39,6 +40,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     int size = 10,
     String sort = 'created_at',
     String order = 'desc',
+    String? query, // General search query
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -53,6 +55,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
         sort: sort,
         order: order,
         school: _userSchool,
+        query: query,
       );
       if (!mounted) return;
       state = state.copyWith(listings: listings, isLoading: false, error: null);
@@ -211,6 +214,26 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
       return true;
     }).toList();
   }
+
+  Future<void> reportListing({
+    required String listingId,
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      await _listingsService.reportListing(
+        listingId: listingId,
+        reason: reason,
+        details: details,
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // requestVerification method removed
+
+  Future<String> getSupportNumber() => _listingsService.fetchSupportNumber();
 }
 
 // Providers

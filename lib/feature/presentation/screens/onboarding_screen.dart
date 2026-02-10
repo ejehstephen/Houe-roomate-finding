@@ -19,19 +19,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Find Compatible\nRoommates',
       description:
           'Connect with people who share your lifestyle, habits, and preferences for a harmonious living experience.',
-      icon: Icons.people_outline_rounded,
+      image: 'assets/images/onboarding_1.jpg',
     ),
     OnboardingContent(
-      title: 'Secure & Easy\nPayments',
-      description:
-          'Handle rent and utility payments securely through our integrated platform with just a few taps.',
-      icon: Icons.shield_outlined,
-    ),
-    OnboardingContent(
-      title: 'Premium Living\nExperience',
+      title: 'Find Your\nPerfect Room',
       description:
           'Discover verified listings and premium amenities that match your standards and comfort.',
-      icon: Icons.star_border_rounded,
+      image: 'assets/images/onboarding_2.jpg',
+    ),
+    OnboardingContent(
+      title: 'Join a\nThriving Community',
+      description:
+          'Be part of a vibrant student community where connections are made and shared experiences last a lifetime.',
+      image: 'assets/images/onboarding_3.jpg',
     ),
   ];
 
@@ -82,145 +82,160 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Skip Button
-            Align(
-              alignment: Alignment.topRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16, top: 16),
-                child: TextButton(
-                  onPressed: _navigateToAuth,
-                  child: Text(
-                    'Skip',
-                    style: TextStyle(
-                      color: Theme.of(context).primaryColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+      body: Stack(
+        children: [
+          // Background Image with Gradient Overlay
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 600),
+              child: Container(
+                key: ValueKey<int>(_currentIndex),
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: AssetImage(_contents[_currentIndex].image),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.1),
+                        Colors.black.withOpacity(0.6),
+                        Colors.black.withOpacity(0.9),
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
                     ),
                   ),
                 ),
               ),
             ),
+          ),
 
-            // Page Content
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                itemCount: _contents.length,
-                itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        FadeInSlide(
-                          key: ValueKey('icon_$index'),
-                          duration: 0.6,
-                          child: Container(
-                            padding: const EdgeInsets.all(32),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).primaryColor.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _contents[index].icon,
-                              size: 80,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
+          SafeArea(
+            child: Column(
+              children: [
+                // Skip Button
+                Align(
+                  alignment: Alignment.topRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16, top: 16),
+                    child: TextButton(
+                      onPressed: _navigateToAuth,
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.black.withOpacity(0.2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        const SizedBox(height: 48),
-                        FadeInSlide(
-                          key: ValueKey('title_$index'),
-                          duration: 0.6,
-                          delay: 0.2,
-                          child: Text(
-                            _contents[index].title,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.displayMedium,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        FadeInSlide(
-                          key: ValueKey('desc_$index'),
-                          duration: 0.6,
-                          delay: 0.4,
-                          child: Text(
-                            _contents[index].description,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(
-                              context,
-                            ).textTheme.bodyLarge?.copyWith(
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyLarge?.color?.withOpacity(0.7),
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            // Bottom Navigation Area
-            Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Page Indicators
-                  Row(
-                    children: List.generate(
-                      _contents.length,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.only(right: 8),
-                        height: 8,
-                        width: _currentIndex == index ? 24 : 8,
-                        decoration: BoxDecoration(
-                          color:
-                              _currentIndex == index
-                                  ? Theme.of(context).primaryColor
-                                  : Theme.of(
-                                    context,
-                                  ).primaryColor.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ),
+                ),
 
-                  // Next/Get Started Button
-                  ElevatedButton(
-                    onPressed: _nextPage,
-                    style: ElevatedButton.styleFrom(
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(20),
-                    ),
-                    child: Icon(
-                      _currentIndex == _contents.length - 1
-                          ? Icons.check
-                          : Icons.arrow_forward,
-                      color: Colors.white,
-                    ),
+                const Spacer(),
+
+                // Page Content
+                Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FadeInSlide(
+                        key: ValueKey('title_$_currentIndex'),
+                        duration: 0.6,
+                        child: Text(
+                          _contents[_currentIndex].title,
+                          textAlign: TextAlign.left,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.displayMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      FadeInSlide(
+                        key: ValueKey('desc_$_currentIndex'),
+                        duration: 0.6,
+                        delay: 0.2,
+                        child: Text(
+                          _contents[_currentIndex].description,
+                          textAlign: TextAlign.left,
+                          style: Theme.of(
+                            context,
+                          ).textTheme.bodyLarge?.copyWith(
+                            color: Colors.white.withOpacity(0.8),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                // Bottom Navigation Area
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(32, 0, 32, 48),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Page Indicators
+                      Row(
+                        children: List.generate(
+                          _contents.length,
+                          (index) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            margin: const EdgeInsets.only(right: 8),
+                            height: 4,
+                            width: _currentIndex == index ? 32 : 12,
+                            decoration: BoxDecoration(
+                              color:
+                                  _currentIndex == index
+                                      ? Theme.of(context).primaryColor
+                                      : Colors.white.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Next/Get Started Button
+                      ElevatedButton(
+                        onPressed: _nextPage,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(20),
+                          elevation: 0,
+                        ),
+                        child: Icon(
+                          _currentIndex == _contents.length - 1
+                              ? Icons.check
+                              : Icons.arrow_forward,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -229,11 +244,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingContent {
   final String title;
   final String description;
-  final IconData icon;
+  final String image;
 
   OnboardingContent({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.image,
   });
 }

@@ -4,7 +4,6 @@ import 'package:camp_nest/feature/presentation/provider/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:camp_nest/core/extension/config.dart';
 import 'package:camp_nest/feature/presentation/screens/update_password_screen.dart';

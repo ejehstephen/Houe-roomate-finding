@@ -15,6 +15,8 @@ class RoomListingModel {
   final DateTime availableFrom;
   final bool isActive;
   final String school;
+  final int reportCount;
+  final bool isFeatured;
 
   RoomListingModel({
     required this.id,
@@ -33,6 +35,8 @@ class RoomListingModel {
     required this.availableFrom,
     this.isActive = true,
     required this.school,
+    this.reportCount = 0,
+    this.isFeatured = false,
   });
 
   factory RoomListingModel.fromJson(Map<String, dynamic> json) {
@@ -66,6 +70,8 @@ class RoomListingModel {
               : DateTime.now(),
       isActive: json['is_active'] ?? json['isActive'] ?? true,
       school: json['school'] ?? '',
+      reportCount: json['report_count'] ?? 0,
+      isFeatured: json['is_featured'] ?? false,
     );
   }
 
@@ -87,6 +93,8 @@ class RoomListingModel {
       'available_from': availableFrom.toIso8601String(),
       'is_active': isActive,
       'school': school,
+      'report_count': reportCount,
+      'is_featured': isFeatured,
     };
   }
 }

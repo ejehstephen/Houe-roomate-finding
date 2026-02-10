@@ -1,5 +1,6 @@
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:camp_nest/feature/presentation/screens/forgot_password_screen.dart';
+import 'package:camp_nest/feature/presentation/screens/verify_email_screen.dart';
 import 'package:camp_nest/feature/presentation/screens/home_screen.dart';
 import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:flutter/material.dart';
@@ -102,23 +103,126 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               );
             } else {
             */
-            // Fallback for non-confirmation flows (if disabled in Supabase)
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Welcome! Setting up your account...'),
-              ),
-            );
+            // Send OTP and navigate to verification screen
+            final email = _emailController.text.trim();
+            final otpResult = await ref
+                .read(authProvider.notifier)
+                .sendEmailVerificationOTP(email);
+
+            if (!mounted) return;
+
+            if (otpResult['success'] == true) {
+              // Navigate to verification screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VerifyEmailScreen(email: email),
+                ),
+              );
+            } else {
+              // Failed to send OTP
+              String errorMessage =
+                  otpResult['error'] ?? 'Failed to send verification code';
+
+              // Check if it's a rate limit error
+              if (errorMessage.toLowerCase().contains(
+                    'email rate limit exceeded',
+                  ) ||
+                  errorMessage.toLowerCase().contains('too many requests') ||
+                  errorMessage.toLowerCase().contains('security purposes')) {
+                // If rate limited, it likely means we JUST sent a code or user is retrying too fast.
+                // We should still let them go to the verification screen to enter the code they (hopefully) received.
+                errorMessage = 'Code already sent! Please check your email.';
+
+                // FORCE NAVIGATION even if rate limited
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VerifyEmailScreen(email: email),
+                  ),
+                );
+              }
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(errorMessage),
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  duration: const Duration(seconds: 4),
+                ),
+              );
+            }
             // }
           }
         } else {
-          // Show clean error feedback
+          // Check if error is because user already exists
           if (mounted && result['error'] != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['error'].toString()),
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-            );
+            final error = result['error'].toString();
+
+            // Check if error is about duplicate email/user already exists
+            if (error.toLowerCase().contains('already') ||
+                error.toLowerCase().contains('duplicate') ||
+                error.toLowerCase().contains('exists')) {
+              // User already exists (probably unverified) - try to send OTP
+              final email = _emailController.text.trim();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Account exists! Sending verification code...'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+
+              final otpResult = await ref
+                  .read(authProvider.notifier)
+                  .sendEmailVerificationOTP(email);
+
+              if (!mounted) return;
+
+              if (otpResult['success'] == true) {
+                // Navigate to verification screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VerifyEmailScreen(email: email),
+                  ),
+                );
+              } else {
+                // Failed to send OTP
+                String errorMessage =
+                    otpResult['error'] ?? 'Failed to send verification code';
+
+                if (errorMessage.toLowerCase().contains(
+                      'email rate limit exceeded',
+                    ) ||
+                    errorMessage.toLowerCase().contains('too many requests') ||
+                    errorMessage.toLowerCase().contains('security purposes')) {
+                  // If rate limited, force navigation so they can enter the code
+                  errorMessage = 'Code already sent! Please check your email.';
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VerifyEmailScreen(email: email),
+                    ),
+                  );
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(errorMessage),
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                );
+              }
+            } else {
+              // Some other error
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(error),
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+              );
+            }
           }
         }
       } else {

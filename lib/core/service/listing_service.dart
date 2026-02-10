@@ -1,4 +1,6 @@
+// import 'dart:io';
 import 'dart:io';
+
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -59,7 +61,7 @@ class ListingsService {
             room_listing_images (images),
             room_listing_amenities (amenities),
             room_listing_rules (rules),
-            owner:users!inner (name, phone_number)
+            owner:users!room_listings_owner_id_fkey (name, phone_number)
           ''')
           .eq('is_active', true);
 
@@ -89,7 +91,7 @@ class ListingsService {
             room_listing_images (images),
             room_listing_amenities (amenities),
             room_listing_rules (rules),
-            owner:users!inner (name, phone_number)
+            owner:users!room_listings_owner_id_fkey (name, phone_number)
           ''')
           .eq('owner_id', user.id)
           .order('created_at', ascending: false);
@@ -112,56 +114,65 @@ class ListingsService {
     String? sort,
     String? order,
     String? school,
+    String? query, // General search query
   }) async {
     try {
-      dynamic query = _client
+      dynamic dbQuery = _client
           .from('room_listings')
           .select('''
             *,
             room_listing_images (images),
             room_listing_amenities (amenities),
             room_listing_rules (rules),
-            owner:users!inner (name, phone_number)
+            owner:users!room_listings_owner_id_fkey (name, phone_number)
           ''')
           .eq('is_active', true);
 
+      // General Text Search (Title, Description, School, Location)
+      if (query != null && query.isNotEmpty) {
+        dbQuery = dbQuery.or(
+          'title.ilike.%$query%,description.ilike.%$query%,school.ilike.%$query%,location.ilike.%$query%',
+        );
+      }
+
       if (location != null && location.isNotEmpty) {
-        query = query.ilike('location', '%$location%');
+        dbQuery = dbQuery.ilike('location', '%$location%');
       }
 
       if (minPrice != null) {
-        query = query.gte('price', minPrice);
+        dbQuery = dbQuery.gte('price', minPrice);
       }
 
       if (maxPrice != null) {
-        query = query.lte('price', maxPrice);
+        dbQuery = dbQuery.lte('price', maxPrice);
       }
 
       if (genderPreference != null &&
           genderPreference.isNotEmpty &&
           genderPreference != 'any') {
-        query = query.eq('gender_preference', genderPreference);
+        dbQuery = dbQuery.eq('gender_preference', genderPreference);
       }
 
+      // Filter by school if explicitly provided (e.g. user's school)
       if (school != null && school.isNotEmpty) {
-        query = query.eq('school', school);
+        dbQuery = dbQuery.eq('school', school);
       }
 
       // Handle sort
       if (sort != null) {
-        query = query.order(sort, ascending: order == 'asc');
+        dbQuery = dbQuery.order(sort, ascending: order == 'asc');
       } else {
-        query = query.order('created_at', ascending: false);
+        dbQuery = dbQuery.order('created_at', ascending: false);
       }
 
       // Handle pagination
       if (page != null && size != null) {
         final start = page * size;
         final end = start + size - 1;
-        query = query.range(start, end);
+        dbQuery = dbQuery.range(start, end);
       }
 
-      final response = await query;
+      final response = await dbQuery;
       return _transformData(response as List);
     } catch (e) {
       print('Error searching listings: $e');
@@ -303,4 +314,62 @@ class ListingsService {
       throw Exception('Delete failed: $e');
     }
   }
+
+  // Fetch support number from app_config
+  Future<String> fetchSupportNumber() async {
+    try {
+      final response =
+          await _client
+              .from('app_config')
+              .select('value')
+              .eq('key', 'support_whatsapp')
+              .maybeSingle();
+
+      if (response != null && response['value'] != null) {
+        return response['value'] as String;
+      }
+      // Fallback
+      return '2348134351762';
+    } catch (e) {
+      print('Error fetching support number: $e');
+      return '2348134351762'; // Fallback
+    }
+  }
+
+  // Report a listing
+  Future<void> reportListing({
+    required String listingId,
+    required String reason,
+    String? details,
+  }) async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user == null) throw Exception('Not authenticated');
+
+      // Fetch the listing to get the reported_user_id (owner_id)
+      final listingData =
+          await _client
+              .from('room_listings')
+              .select('owner_id')
+              .eq('id', listingId)
+              .single();
+
+      final reportedUserId = listingData['owner_id'];
+
+      await _client.from('reports').insert({
+        'reporter_id': user.id,
+        'reported_listing_id': listingId,
+        'reported_user_id': reportedUserId,
+        'reason': reason,
+        'details': details,
+        'status': 'pending',
+      });
+    } catch (e) {
+      print('Error reporting listing: $e');
+      throw Exception('Failed to report listing: $e');
+    }
+  }
+
+  // Request verification for a listing
+  // requestVerification method removed
 }

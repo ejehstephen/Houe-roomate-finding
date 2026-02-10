@@ -1,6 +1,6 @@
 -- Seed Questionnaire Questions and Options with UUIDs
 
--- 1. Insert Questions
+-- 1. Insert/Update Questions
 INSERT INTO questionnaire_questions (id, question, type) VALUES
   ('22222222-2222-2222-2222-222222222222', 'How would you describe your cleanliness level?', 'single'),
   ('33333333-3333-3333-3333-333333333333', 'What is your typical sleep schedule?', 'single'),
@@ -11,9 +11,24 @@ INSERT INTO questionnaire_questions (id, question, type) VALUES
   ('99999999-9999-9999-9999-999999999999', 'What are your hobbies/interests?', 'multiple'),
   ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'How important is it to be friends with your roommate?', 'single'),
   ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Do you have an apartment?', 'single')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  question = EXCLUDED.question,
+  type = EXCLUDED.type;
 
--- 2. Insert Options for each Question
+-- 2. Refresh Options (Delete old options for these questions to avoid duplicates)
+DELETE FROM question_options WHERE question_id IN (
+  '22222222-2222-2222-2222-222222222222',
+  '33333333-3333-3333-3333-333333333333',
+  '44444444-4444-4444-4444-444444444444',
+  '55555555-5555-5555-5555-555555555555',
+  '66666666-6666-6666-6666-666666666666',
+  '77777777-7777-7777-7777-777777777777',
+  '99999999-9999-9999-9999-999999999999',
+  'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+);
+
+-- 3. Insert Options for each Question
 
 -- Question 2: Cleanliness
 INSERT INTO question_options (question_id, options) VALUES

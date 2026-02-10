@@ -12,6 +12,7 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:camp_nest/feature/presentation/screens/notification.dart';
 import 'package:camp_nest/feature/presentation/provider/notification_provider.dart';
+import 'package:camp_nest/feature/presentation/screens/verification_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -49,6 +50,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         print(
           '✅ DEBUG HomeScreen: Token available after wait, clearing error and loading listings',
         );
+        // Check if widget is still mounted before using ref
+        if (!mounted) return;
+
         // Force clear any existing error state first
         ref.read(listingsProvider.notifier).clearError();
         // Then reload listings
@@ -57,12 +61,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         print(
           '❌ DEBUG HomeScreen: Still no token, proceeding with load (will show error)',
         );
+        // Check if widget is still mounted before using ref
+        if (!mounted) return;
+
         ref.read(listingsProvider.notifier).loadAllListings();
       }
     } else {
       print(
         '✅ DEBUG HomeScreen: Token available immediately, clearing error and loading listings',
       );
+      // Check if widget is still mounted before using ref
+      if (!mounted) return;
+
       // Clear any existing error state first
       ref.read(listingsProvider.notifier).clearError();
       // Then load listings
@@ -82,6 +92,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       // Try to refresh user state if no token
       try {
+        // Check if widget is still mounted before using ref
+        if (!mounted) return;
+
         await ref.read(authProvider.notifier).refreshUser();
         final refreshedToken = await authService.getToken();
         if (refreshedToken != null) {
@@ -455,11 +468,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 MaterialPageRoute(builder: (context) => const ListingsScreen()),
               );
             } else if (index == 2) {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const PostListingScreen(),
-                ),
-              );
+              final user = ref.read(authProvider).user;
+              if (user?.isVerified == true) {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const PostListingScreen(),
+                  ),
+                );
+              } else {
+                showDialog(
+                  context: context,
+                  builder:
+                      (context) => AlertDialog(
+                        title: const Text('Verification Required'),
+                        content: const Text(
+                          'To ensure trust and safety, you must verify your identity before posting a room listing.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) => const VerificationScreen(),
+                                ), // Needs import
+                              );
+                            },
+                            child: const Text('Verify Identity'),
+                          ),
+                        ],
+                      ),
+                );
+              }
             } else if (index == 3) {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),

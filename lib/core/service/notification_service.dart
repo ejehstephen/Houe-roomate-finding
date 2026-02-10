@@ -50,6 +50,14 @@ class NotificationService {
     }
   }
 
+  Future<void> deleteNotification(String notificationId) async {
+    try {
+      await _client.from('notifications').delete().eq('id', notificationId);
+    } catch (e) {
+      print('Error deleting notification: $e');
+    }
+  }
+
   Stream<List<NotificationModel>> getNotificationsStream() {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) return const Stream.empty();

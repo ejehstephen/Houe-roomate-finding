@@ -73,18 +73,15 @@ class AuthService {
       }
 
       // If session is null, it means email confirmation is required
-      // DEV: We are assuming email confirmation is OFF in Supabase for now.
-      /*
       if (session == null) {
         // We do NOT store user locally yet because they aren't fully logged in
         return {
           'success': true,
-          'message': 'Please check your email to confirm your account.',
+          'message': 'Please check your email to verify your account.',
           'emailConfirmationRequired': true,
           'user': null,
         };
       }
-      */
 
       // 2. Insert extra fields into public.users
       // NOTE: We now rely on a POSTGRES TRIGGER to do this insertion to avoid RLS issues.
@@ -155,6 +152,122 @@ class AuthService {
     }
   }
 
+  // ========================= OTP-BASED AUTHENTICATION =========================
+
+  /// Send OTP to email for email verification (sign-up confirmation)
+  Future<Map<String, dynamic>> sendEmailVerificationOTP(String email) async {
+    try {
+      await _client.auth.signInWithOtp(
+        email: email,
+        emailRedirectTo: null, // OTP only, no redirect
+      );
+      return {
+        'success': true,
+        'message': 'Verification code sent to your email!',
+      };
+    } catch (e) {
+      if (e is AuthException) {
+        return {'success': false, 'error': e.message};
+      }
+      return {'success': false, 'error': 'Error sending OTP: $e'};
+    }
+  }
+
+  /// Verify email OTP code
+  Future<Map<String, dynamic>> verifyEmailOTP({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response = await _client.auth.verifyOTP(
+        email: email,
+        token: otp,
+        type: OtpType.email,
+      );
+
+      if (response.session != null && response.user != null) {
+        // Fetch full user profile
+        final userModel = await getUserProfile(response.user!.id);
+        if (userModel != null) {
+          await _storeUser(userModel);
+        }
+
+        return {
+          'success': true,
+          'message': 'Email verified successfully!',
+          'user': userModel,
+        };
+      }
+
+      return {'success': false, 'error': 'Verification failed'};
+    } catch (e) {
+      if (e is AuthException) {
+        return {'success': false, 'error': e.message};
+      }
+      return {'success': false, 'error': 'Error verifying OTP: $e'};
+    }
+  }
+
+  /// Send OTP for password reset
+  Future<Map<String, dynamic>> sendPasswordResetOTP(String email) async {
+    try {
+      await _client.auth.signInWithOtp(
+        email: email,
+        shouldCreateUser: false, // Don't create new user if email doesn't exist
+        emailRedirectTo: null,
+      );
+      return {
+        'success': true,
+        'message': 'Password reset code sent to your email!',
+      };
+    } catch (e) {
+      if (e is AuthException) {
+        return {'success': false, 'error': e.message};
+      }
+      return {'success': false, 'error': 'Error: $e'};
+    }
+  }
+
+  /// Verify OTP and reset password
+  Future<Map<String, dynamic>> verifyOTPAndResetPassword({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      // First verify the OTP
+      final verifyResponse = await _client.auth.verifyOTP(
+        email: email,
+        token: otp,
+        type: OtpType.email,
+      );
+
+      if (verifyResponse.session == null) {
+        return {'success': false, 'error': 'Invalid or expired OTP'};
+      }
+
+      // Update password
+      await _client.auth.updateUser(UserAttributes(password: newPassword));
+
+      // Sign out after password reset (user will need to log in with new password)
+      await signOut();
+
+      return {
+        'success': true,
+        'message':
+            'Password reset successfully! Please log in with your new password.',
+      };
+    } catch (e) {
+      if (e is AuthException) {
+        return {'success': false, 'error': e.message};
+      }
+      return {'success': false, 'error': 'Error resetting password: $e'};
+    }
+  }
+
+  // ========================= LEGACY DEEPLINK-BASED (DEPRECATED) =========================
+
+  @Deprecated('Use sendPasswordResetOTP instead')
   Future<Map<String, dynamic>> resetPassword({required String email}) async {
     try {
       await _client.auth.resetPasswordForEmail(
