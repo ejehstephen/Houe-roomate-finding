@@ -70,276 +70,286 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Profile Photo Section
-                FadeInSlide(
-                  duration: 0.5,
-                  child: Center(
-                    child: Stack(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: theme.primaryColor,
-                              width: 2,
-                            ),
-                          ),
-                          child: Consumer(
-                            builder: (context, ref, _) {
-                              final currentUser =
-                                  ref.watch(authProvider).user ?? widget.user;
-                              return CircleAvatar(
-                                radius: 60,
-                                backgroundColor: theme.primaryColor.withOpacity(
-                                  0.1,
-                                ),
-                                backgroundImage:
-                                    currentUser.profileImage != null &&
-                                            currentUser.profileImage!.isNotEmpty
-                                        ? NetworkImage(
-                                          currentUser.profileImage!,
-                                        )
-                                        : null,
-                                child:
-                                    currentUser.profileImage == null ||
-                                            currentUser.profileImage!.isEmpty
-                                        ? Text(
-                                          currentUser.name.isNotEmpty
-                                              ? currentUser.name[0]
-                                                  .toUpperCase()
-                                              : 'U',
-                                          style: TextStyle(
-                                            fontSize: 40,
-                                            fontWeight: FontWeight.bold,
-                                            color: theme.primaryColor,
-                                          ),
-                                        )
-                                        : null,
-                              );
-                            },
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: InkWell(
-                            onTap: _isUploading ? null : _uploadImage,
-                            borderRadius: BorderRadius.circular(30),
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Profile Photo Section
+                    FadeInSlide(
+                      duration: 0.5,
+                      child: Center(
+                        child: Stack(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: theme.primaryColor,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: theme.scaffoldBackgroundColor,
-                                  width: 3,
+                                  color: theme.primaryColor,
+                                  width: 2,
                                 ),
                               ),
-                              child:
-                                  _isUploading
-                                      ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                      : const Icon(
-                                        Icons.camera_alt_outlined,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-
-                // Form Fields
-                FadeInSlide(
-                  duration: 0.5,
-                  delay: 0.1,
-                  child: Column(
-                    children: [
-                      _buildTextField(
-                        controller: _nameController,
-                        label: 'Full Name',
-                        hint: 'Your Name',
-                        icon: Icons.person_outline,
-                        validator:
-                            (v) =>
-                                (v == null || v.trim().isEmpty)
-                                    ? 'Name is required'
-                                    : null,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _emailController,
-                        label: 'Email',
-                        hint: 'your.email@example.com',
-                        icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        validator:
-                            (v) =>
-                                (v == null || v.trim().isEmpty)
-                                    ? 'Email is required'
-                                    : null,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _schoolController,
-                        label: 'School',
-                        hint: 'University/College Name',
-                        icon: Icons.school_outlined,
-                        validator:
-                            (v) =>
-                                (v == null || v.trim().isEmpty)
-                                    ? 'School is required'
-                                    : null,
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: _ageController,
-                              label: 'Age',
-                              hint: '20',
-                              icon: Icons.cake_outlined,
-                              keyboardType: TextInputType.number,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) return null;
-                                final value = int.tryParse(v.trim());
-                                if (value == null || value < 0)
-                                  return 'Invalid';
-                                return null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
+                              child: Consumer(
+                                builder: (context, ref, _) {
+                                  final currentUser =
+                                      ref.watch(authProvider).user ??
+                                      widget.user;
+                                  return CircleAvatar(
+                                    radius: 60,
+                                    backgroundColor: theme.primaryColor
+                                        .withOpacity(0.1),
+                                    backgroundImage:
+                                        currentUser.profileImage != null &&
+                                                currentUser
+                                                    .profileImage!
+                                                    .isNotEmpty
+                                            ? NetworkImage(
+                                              currentUser.profileImage!,
+                                            )
+                                            : null,
+                                    child:
+                                        currentUser.profileImage == null ||
+                                                currentUser
+                                                    .profileImage!
+                                                    .isEmpty
+                                            ? Text(
+                                              currentUser.name.isNotEmpty
+                                                  ? currentUser.name[0]
+                                                      .toUpperCase()
+                                                  : 'U',
+                                              style: TextStyle(
+                                                fontSize: 40,
+                                                fontWeight: FontWeight.bold,
+                                                color: theme.primaryColor,
+                                              ),
+                                            )
+                                            : null,
+                                  );
+                                },
                               ),
-                              decoration: BoxDecoration(
-                                color:
-                                    isDark
-                                        ? Colors.grey[900]
-                                        : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.grey.withOpacity(0.2),
-                                ),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButtonFormField<String>(
-                                  value: (_gender.isEmpty) ? null : _gender,
-                                  isExpanded: true,
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    prefixIcon: Icon(
-                                      Icons.people_outline,
-                                      size: 22,
-                                    ),
-                                    labelText: 'Gender',
-                                    contentPadding: EdgeInsets.symmetric(
-                                      vertical: 12,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: InkWell(
+                                onTap: _isUploading ? null : _uploadImage,
+                                borderRadius: BorderRadius.circular(30),
+                                child: Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: theme.primaryColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: theme.scaffoldBackgroundColor,
+                                      width: 3,
                                     ),
                                   ),
-                                  items: const [
-                                    DropdownMenuItem(
-                                      value: 'male',
-                                      child: Text('Male'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'female',
-                                      child: Text('Female'),
-                                    ),
-                                    DropdownMenuItem(
-                                      value: 'other',
-                                      child: Text('Other'),
-                                    ),
-                                  ],
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _gender = value ?? '';
-                                    });
+                                  child:
+                                      _isUploading
+                                          ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                          : const Icon(
+                                            Icons.camera_alt_outlined,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Form Fields
+                    FadeInSlide(
+                      duration: 0.5,
+                      delay: 0.1,
+                      child: Column(
+                        children: [
+                          _buildTextField(
+                            controller: _nameController,
+                            label: 'Full Name',
+                            hint: 'Your Name',
+                            icon: Icons.person_outline,
+                            validator:
+                                (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                        ? 'Name is required'
+                                        : null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _emailController,
+                            label: 'Email',
+                            hint: 'your.email@example.com',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                            validator:
+                                (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                        ? 'Email is required'
+                                        : null,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _schoolController,
+                            label: 'School',
+                            hint: 'University/College Name',
+                            icon: Icons.school_outlined,
+                            validator:
+                                (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                        ? 'School is required'
+                                        : null,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _ageController,
+                                  label: 'Age',
+                                  hint: '20',
+                                  icon: Icons.cake_outlined,
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty)
+                                      return null;
+                                    final value = int.tryParse(v.trim());
+                                    if (value == null || value < 0)
+                                      return 'Invalid';
+                                    return null;
                                   },
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        isDark
+                                            ? Colors.grey[900]
+                                            : Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: Colors.grey.withOpacity(0.2),
+                                    ),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButtonFormField<String>(
+                                      value: (_gender.isEmpty) ? null : _gender,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        prefixIcon: Icon(
+                                          Icons.people_outline,
+                                          size: 22,
+                                        ),
+                                        labelText: 'Gender',
+                                        contentPadding: EdgeInsets.symmetric(
+                                          vertical: 12,
+                                        ),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: 'male',
+                                          child: Text('Male'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'female',
+                                          child: Text('Female'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 'other',
+                                          child: Text('Other'),
+                                        ),
+                                      ],
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _gender = value ?? '';
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _phoneController,
+                            label: 'Phone Number',
+                            hint: '+1234567890',
+                            icon: Icons.phone_outlined,
+                            keyboardType: TextInputType.phone,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      _buildTextField(
-                        controller: _phoneController,
-                        label: 'Phone Number',
-                        hint: '+1234567890',
-                        icon: Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // Save Button
-                FadeInSlide(
-                  duration: 0.5,
-                  delay: 0.2,
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _onSave,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primaryColor,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 4,
-                        shadowColor: theme.primaryColor.withOpacity(0.4),
-                      ),
-                      child:
-                          _isLoading
-                              ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                              : const Text(
-                                'Save Changes',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                     ),
-                  ),
+
+                    const SizedBox(height: 40),
+
+                    // Save Button
+                    FadeInSlide(
+                      duration: 0.5,
+                      delay: 0.2,
+                      child: SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _onSave,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: theme.primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            elevation: 4,
+                            shadowColor: theme.primaryColor.withOpacity(0.4),
+                          ),
+                          child:
+                              _isLoading
+                                  ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Text(
+                                    'Save Changes',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                 ),
-                const SizedBox(height: 24),
-              ],
+              ),
             ),
           ),
         ),

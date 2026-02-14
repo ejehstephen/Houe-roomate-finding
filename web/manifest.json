@@ -1,11 +1,11 @@
 {
-    "name": "camp_nest",
-    "short_name": "camp_nest",
+    "name": "CampNest - Student Roommate Finder",
+    "short_name": "CampNest",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Find compatible roommates and perfect student housing. Connect with students who share your lifestyle and preferences.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

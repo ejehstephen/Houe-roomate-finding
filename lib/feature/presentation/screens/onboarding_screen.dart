@@ -11,7 +11,6 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  final PageController _pageController = PageController();
   int _currentIndex = 0;
 
   final List<OnboardingContent> _contents = [
@@ -19,34 +18,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Find Compatible\nRoommates',
       description:
           'Connect with people who share your lifestyle, habits, and preferences for a harmonious living experience.',
-      image: 'assets/images/onboarding_1.jpg',
+      image: 'assets/images/students-sharing-apartment.webp',
     ),
     OnboardingContent(
       title: 'Find Your\nPerfect Room',
       description:
           'Discover verified listings and premium amenities that match your standards and comfort.',
-      image: 'assets/images/onboarding_2.jpg',
+      image: 'assets/images/istockphoto-.jpg',
     ),
     OnboardingContent(
       title: 'Join a\nThriving Community',
       description:
           'Be part of a vibrant student community where connections are made and shared experiences last a lifetime.',
-      image: 'assets/images/onboarding_3.jpg',
+      image: 'assets/images/student-org-african-student-.png',
     ),
   ];
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
   void _nextPage() {
     if (_currentIndex < _contents.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeOutCubic,
-      );
+      setState(() {
+        _currentIndex++;
+      });
     } else {
       _navigateToAuth();
     }
@@ -93,7 +85,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 decoration: BoxDecoration(
                   image: DecorationImage(
                     image: AssetImage(_contents[_currentIndex].image),
-                    fit: BoxFit.cover,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 child: Container(

@@ -104,12 +104,40 @@ class AdminUsersTab extends ConsumerWidget {
                         },
                       ),
                     if (user.isBanned)
-                      const Text(
-                        'BANNED',
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      IconButton(
+                        icon: const Icon(Icons.lock_open, color: Colors.orange),
+                        tooltip: 'Unban User',
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder:
+                                (context) => AlertDialog(
+                                  title: const Text('Unban User'),
+                                  content: Text(
+                                    'Are you sure you want to unban ${user.name}?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed:
+                                          () => Navigator.pop(context, true),
+                                      child: const Text('Unban'),
+                                    ),
+                                  ],
+                                ),
+                          );
+
+                          if (confirm == true) {
+                            await ref
+                                .read(adminServiceProvider)
+                                .unbanUser(user.id);
+                            ref.invalidate(adminUsersProvider);
+                          }
+                        },
                       ),
                   ],
                 ),

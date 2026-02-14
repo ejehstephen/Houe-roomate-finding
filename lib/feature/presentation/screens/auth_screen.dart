@@ -22,6 +22,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   final _ageController = TextEditingController();
   String _selectedGender = 'male';
   bool _isSignUp = false;
+  bool _isPasswordVisible = false;
 
   @override
   void dispose() {
@@ -440,11 +441,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           TextFormField(
                             controller: _passwordController,
                             textInputAction: TextInputAction.done,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Password',
-                              prefixIcon: Icon(Icons.lock_outline),
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _isPasswordVisible
+                                      ? Icons.visibility
+                                      : Icons.visibility_off,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _isPasswordVisible = !_isPasswordVisible;
+                                  });
+                                },
+                              ),
                             ),
-                            obscureText: true,
+                            obscureText: !_isPasswordVisible,
                             validator: _validatePassword,
                             onFieldSubmitted: (_) => _submitForm(),
                           ),

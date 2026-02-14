@@ -51,6 +51,30 @@ class ListingsService {
     }).toList();
   }
 
+  // Get single listing by ID
+  Future<RoomListingModel?> getListingById(String id) async {
+    try {
+      final response =
+          await _client
+              .from('room_listings')
+              .select('''
+            *,
+            room_listing_images (images),
+            room_listing_amenities (amenities),
+            room_listing_rules (rules),
+            owner:users!room_listings_owner_id_fkey (name, phone_number)
+          ''')
+              .eq('id', id)
+              .single();
+
+      final list = _transformData([response]);
+      return list.isNotEmpty ? list.first : null;
+    } catch (e) {
+      print('Error fetching listing by id: $e');
+      return null;
+    }
+  }
+
   // Get all active listings
   Future<List<RoomListingModel>> getAllListings({String? school}) async {
     try {
@@ -65,8 +89,8 @@ class ListingsService {
           ''')
           .eq('is_active', true);
 
-      if (school != null && school.isNotEmpty) {
-        query = query.eq('school', school);
+      if (school != null && school.trim().isNotEmpty) {
+        query = query.ilike('school', '%${school.trim()}%');
       }
 
       final response = await query.order('created_at', ascending: false);
@@ -129,14 +153,16 @@ class ListingsService {
           .eq('is_active', true);
 
       // General Text Search (Title, Description, School, Location)
-      if (query != null && query.isNotEmpty) {
+      if (query != null && query.trim().isNotEmpty) {
+        // Trim and collapse multiple spaces
+        final q = query.trim().replaceAll(RegExp(r'\s+'), ' ');
         dbQuery = dbQuery.or(
-          'title.ilike.%$query%,description.ilike.%$query%,school.ilike.%$query%,location.ilike.%$query%',
+          'title.ilike.%$q%,description.ilike.%$q%,school.ilike.%$q%,location.ilike.%$q%',
         );
       }
 
-      if (location != null && location.isNotEmpty) {
-        dbQuery = dbQuery.ilike('location', '%$location%');
+      if (location != null && location.trim().isNotEmpty) {
+        dbQuery = dbQuery.ilike('location', '%${location.trim()}%');
       }
 
       if (minPrice != null) {
@@ -148,14 +174,14 @@ class ListingsService {
       }
 
       if (genderPreference != null &&
-          genderPreference.isNotEmpty &&
-          genderPreference != 'any') {
-        dbQuery = dbQuery.eq('gender_preference', genderPreference);
+          genderPreference.trim().isNotEmpty &&
+          genderPreference.trim() != 'any') {
+        dbQuery = dbQuery.ilike('gender_preference', genderPreference.trim());
       }
 
       // Filter by school if explicitly provided (e.g. user's school)
-      if (school != null && school.isNotEmpty) {
-        dbQuery = dbQuery.eq('school', school);
+      if (school != null && school.trim().isNotEmpty) {
+        dbQuery = dbQuery.ilike('school', '%${school.trim()}%');
       }
 
       // Handle sort

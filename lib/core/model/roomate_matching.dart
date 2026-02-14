@@ -42,13 +42,38 @@ class RoommateMatchModel {
   });
 
   factory RoommateMatchModel.fromJson(Map<String, dynamic> json) {
-    final dynamic common = json['commonInterests'];
-    final dynamic prefs = json['preferences'];
+    // Handle commonInterests from both camelCase (local) and the RPC JSONB array
+    final dynamic common =
+        json['commonInterests'] ??
+        json['common_interests'] ??
+        json['common_interests_json'];
+    final dynamic prefs = json['preferences'] ?? json['prefs'];
+
+    // Parse common interests: can be a JSONB array (List) or null
+    List<String> parsedInterests = const <String>[];
+    if (common is List) {
+      parsedInterests = common.map((e) => e.toString()).toList();
+    }
+
+    // Parse preferences: can be a JSONB object (Map), a List, or null
+    Map<String, String> parsedPrefs = <String, String>{};
+    if (prefs is Map) {
+      parsedPrefs = Map<String, String>.fromEntries(
+        prefs.entries.map(
+          (e) => MapEntry(e.key.toString(), e.value?.toString() ?? ''),
+        ),
+      );
+    }
 
     return RoommateMatchModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
-      profileImage: json['profileImage']?.toString() ?? '',
+      profileImage:
+          (json['profileImage'] ??
+                  json['profile_image'] ??
+                  json['match_profile_image'] ??
+                  '')
+              .toString(),
       age:
           json['age'] is int
               ? json['age'] as int
@@ -60,21 +85,24 @@ class RoommateMatchModel {
               ? (json['budget'] as num).toDouble()
               : double.tryParse(json['budget']?.toString() ?? '') ?? 0.0,
       compatibilityScore:
-          json['compatibilityScore'] is int
-              ? json['compatibilityScore'] as int
-              : int.tryParse(json['compatibilityScore']?.toString() ?? '') ?? 0,
-      commonInterests:
-          (common is List)
-              ? common.map((e) => e.toString()).toList()
-              : const <String>[],
-      preferences:
-          (prefs is Map)
-              ? Map<String, String>.fromEntries(
-                (prefs).entries.map(
-                  (e) => MapEntry(e.key.toString(), e.value?.toString() ?? ''),
-                ),
-              )
-              : <String, String>{},
+          (json['compatibilityScore'] ??
+                      json['compatibility_score'] ??
+                      json['compat_score'])
+                  is int
+              ? (json['compatibilityScore'] ??
+                      json['compatibility_score'] ??
+                      json['compat_score'])
+                  as int
+              : int.tryParse(
+                    (json['compatibilityScore'] ??
+                                json['compatibility_score'] ??
+                                json['compat_score'])
+                            ?.toString() ??
+                        '',
+                  ) ??
+                  0,
+      commonInterests: parsedInterests,
+      preferences: parsedPrefs,
       phoneNumber: json['phoneNumber'] ?? json['phone_number'],
     );
   }

@@ -9,7 +9,7 @@ class AppTheme {
     102,
     251,
   ); // Deep Indigo
-  static const Color primaryDark = Color(0xFF312E81);
+  static const Color primaryDark = Color.fromARGB(255, 246, 3, 3);
   static const Color accentColor = Color(0xFFF59E0B); // Amber/Gold
   static const Color backgroundColor = Color(0xFFF9FAFB); // Cool Gray 50
   static const Color surfaceColor = Colors.white;

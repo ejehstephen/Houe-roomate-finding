@@ -39,27 +39,35 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
         backgroundColor: theme.appBarTheme.backgroundColor,
         surfaceTintColor: Colors.transparent,
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: theme.primaryColor,
-        child:
-            matchesState.isLoading
-                ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(color: theme.primaryColor),
-                      const SizedBox(height: 24),
-                      Text(
-                        'Finding your perfect roommates...',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            color: theme.primaryColor,
+            child:
+                matchesState.isLoading
+                    ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: theme.primaryColor),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Finding your perfect roommates...',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                )
-                : matchesState.error != null
-                ? _buildErrorState(theme, matchesState.error!)
-                : _buildMatchesList(theme, matchesState),
+                    )
+                    : matchesState.error != null
+                    ? _buildErrorState(theme, matchesState.error!)
+                    : _buildMatchesList(theme, matchesState),
+          ),
+        ),
       ),
     );
   }
@@ -209,7 +217,7 @@ class _MatchResultsScreenState extends ConsumerState<MatchResultsScreen> {
                         duration: 0.5,
                         delay: index * 0.1,
                         child: Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.only(bottom: 24),
                           child: RoommateCard(
                             match: match,
                             onChatPressed: () async {

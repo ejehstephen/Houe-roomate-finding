@@ -1,7 +1,5 @@
-// import 'dart:io';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/core/service/listing_service.dart';
-import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class ListingsState {
@@ -26,10 +24,21 @@ class ListingsState {
 
 class ListingsNotifier extends StateNotifier<ListingsState> {
   final ListingsService _listingsService;
-  final String? _userSchool;
 
-  ListingsNotifier(this._listingsService, this._userSchool)
-    : super(ListingsState());
+  ListingsNotifier(this._listingsService) : super(ListingsState()) {
+    // Auto-fetch all listings when provider is created
+    loadAllListings();
+  }
+
+  /// The user's school, passed in when calling loadAllListings or loadListings.
+  /// We read it at call time, NOT at construction time, so the provider
+  /// doesn't need to be recreated when auth state changes.
+  String? _resolveSchool;
+
+  /// Set the school filter for future loads (called once from HomeScreen)
+  void setSchool(String? school) {
+    _resolveSchool = school;
+  }
 
   Future<void> loadListings({
     double? maxPrice,
@@ -40,7 +49,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     int size = 10,
     String sort = 'created_at',
     String order = 'desc',
-    String? query, // General search query
+    String? query,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -54,7 +63,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
         size: size,
         sort: sort,
         order: order,
-        school: _userSchool,
+        school: _resolveSchool,
         query: query,
       );
       if (!mounted) return;
@@ -69,63 +78,18 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      // Debug: log rules received from UI before sending to service
       print('ListingsNotifier.addListing - listing.rules: ${listing.rules}');
 
-      final newListing = await _listingsService.createListing(listing: listing);
+      await _listingsService.createListing(listing: listing);
       if (!mounted) return;
 
-      if (newListing != null) {
-        // ... (logic for whatsapp link fallback) ...
-        String? clientWhatsapp =
-            newListing.whatsappLink ?? listing.whatsappLink;
-        if ((clientWhatsapp == null || clientWhatsapp.isEmpty) &&
-            (newListing.ownerPhone ?? listing.ownerPhone) != null) {
-          final phone = (newListing.ownerPhone ?? listing.ownerPhone)!;
-          final sanitized = phone.replaceAll(RegExp(r'[\s\-()]+'), '');
-          final normalized =
-              sanitized.startsWith('+') ? sanitized.substring(1) : sanitized;
-          clientWhatsapp =
-              'https://wa.me/$normalized?text=' +
-              Uri.encodeComponent(
-                'Hi! I\'m interested in your room listing: "${newListing.title}".',
-              );
-        }
-
-        final mergedListing = RoomListingModel(
-          id: newListing.id,
-          title: newListing.title,
-          description: newListing.description,
-          price: newListing.price,
-          location: newListing.location,
-          images: newListing.images,
-          ownerId: newListing.ownerId,
-          ownerName: newListing.ownerName,
-          ownerPhone: newListing.ownerPhone ?? listing.ownerPhone,
-          whatsappLink:
-              newListing.whatsappLink ?? listing.whatsappLink ?? clientWhatsapp,
-          amenities:
-              newListing.amenities.isNotEmpty
-                  ? newListing.amenities
-                  : listing.amenities,
-          rules:
-              (newListing.rules.isNotEmpty) ? newListing.rules : listing.rules,
-          gender: newListing.gender,
-          availableFrom: newListing.availableFrom,
-          isActive: newListing.isActive,
-          school: newListing.school,
-        );
-
-        // Prepend the new listing so it appears at the top of the list immediately
-        state = state.copyWith(
-          listings: [mergedListing, ...state.listings],
-          isLoading: false,
-        );
-      }
+      // After posting, refetch ALL listings from the database so the user
+      // sees everyone's listings (not just their own).
+      await loadAllListings();
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);
-      rethrow; // Re-throw so the UI can handle it
+      rethrow;
     }
   }
 
@@ -159,8 +123,6 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
       state = state.copyWith(listings: updatedListings, isLoading: false);
     } catch (e) {
       if (!mounted) return;
-      // don't persist the error into global listings state (that hides the list);
-      // let callers handle the error so they can show context-appropriate UI.
       state = state.copyWith(isLoading: false);
       rethrow;
     }
@@ -168,11 +130,26 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
 
   // Load all listings (no search filters)
   Future<void> loadAllListings() async {
+    // Don't reload if we're already loading
+    if (state.isLoading) return;
+
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final listings = await _listingsService.getAllListings(
-        school: _userSchool,
+      // 1. Try to fetch user's school listings
+      var listings = await _listingsService.getAllListings(
+        school: _resolveSchool,
       );
+
+      // 2. If no listings found for school, fetch ALL listings (fallback)
+      if (listings.isEmpty &&
+          _resolveSchool != null &&
+          _resolveSchool!.isNotEmpty) {
+        print(
+          'INFO: No listings found for $_resolveSchool. Fetching all listings.',
+        );
+        listings = await _listingsService.getAllListings();
+      }
+
       if (!mounted) return;
       state = state.copyWith(listings: listings, isLoading: false, error: null);
     } catch (e) {
@@ -231,8 +208,6 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     }
   }
 
-  // requestVerification method removed
-
   Future<String> getSupportNumber() => _listingsService.fetchSupportNumber();
 }
 
@@ -241,21 +216,16 @@ final listingsServiceProvider = Provider<ListingsService>(
   (ref) => ListingsService(),
 );
 
+/// This provider is NOT dependent on authProvider, so it will NOT be
+/// destroyed/recreated when auth state changes. The school filter is
+/// set manually via setSchool() from the HomeScreen.
 final listingsProvider = StateNotifierProvider<ListingsNotifier, ListingsState>(
   (ref) {
-    final authState = ref.watch(authProvider);
-    return ListingsNotifier(
-      ref.read(listingsServiceProvider),
-      authState.user?.school,
-    );
+    return ListingsNotifier(ref.read(listingsServiceProvider));
   },
 );
 
 final searchListingsProvider =
     StateNotifierProvider.autoDispose<ListingsNotifier, ListingsState>((ref) {
-      final authState = ref.watch(authProvider);
-      return ListingsNotifier(
-        ref.read(listingsServiceProvider),
-        authState.user?.school,
-      );
+      return ListingsNotifier(ref.read(listingsServiceProvider));
     });

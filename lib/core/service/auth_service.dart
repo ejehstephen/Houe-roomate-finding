@@ -136,6 +136,16 @@ class AuthService {
       final userProfile = await getUserProfile(user.id);
 
       if (userProfile != null) {
+        // Check if user is banned
+        if (userProfile.isBanned) {
+          await signOut(); // Force logout
+          return {
+            'success': false,
+            'error':
+                'Your account has been suspended for violating community guidelines. Please contact support if you believe this is an error.',
+          };
+        }
+
         await _storeUser(userProfile);
         return {'success': true, 'user': userProfile};
       }
@@ -440,6 +450,11 @@ class AuthService {
 
     final profile = await getUserProfile(session.user.id);
     if (profile != null) {
+      // If user was banned, force logout
+      if (profile.isBanned) {
+        await signOut();
+        return null;
+      }
       await _storeUser(profile); // Update local cache with fresh data
     }
     return profile;

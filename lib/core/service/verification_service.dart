@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VerificationService {
@@ -10,30 +10,32 @@ class VerificationService {
     required DateTime dateOfBirth,
     required String ninNumber,
     required String documentType,
-    required File frontImage,
-    File? backImage,
+    required XFile frontImage,
+    XFile? backImage,
   }) async {
     try {
       final userId = _client.auth.currentUser?.id;
       if (userId == null) throw Exception('User not logged in');
 
-      // 1. Upload Images to private bucket
+      // 1. Upload Images to private bucket using bytes (works on web + mobile)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final frontExt = frontImage.path.split('.').last;
+      final frontExt = frontImage.name.split('.').last;
 
       // Path format: user_id/timestamp_front.jpg
       final frontPath = '$userId/${timestamp}_front.$frontExt';
+      final frontBytes = await frontImage.readAsBytes();
       await _client.storage
           .from('verification_docs')
-          .upload(frontPath, frontImage);
+          .uploadBinary(frontPath, frontBytes);
 
       String? backPath;
       if (backImage != null) {
-        final backExt = backImage.path.split('.').last;
+        final backExt = backImage.name.split('.').last;
         backPath = '$userId/${timestamp}_back.$backExt';
+        final backBytes = await backImage.readAsBytes();
         await _client.storage
             .from('verification_docs')
-            .upload(backPath, backImage);
+            .uploadBinary(backPath, backBytes);
       }
 
       // 2. Insert Request Record

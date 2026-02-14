@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "chat-9e2ce"
-  }
+    "default": "chat-9e2ce",
+    "campnest": "campnest-4b4d2"
+  },
+  "targets": {},
+  "etags": {}
 }

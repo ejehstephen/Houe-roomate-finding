@@ -29,73 +29,82 @@ class NotificationScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: notificationsAsync.when(
-        loading:
-            () => Center(
-              child: CircularProgressIndicator(color: theme.primaryColor),
-            ),
-        error:
-            (error, stack) => Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
-                  const SizedBox(height: 16),
-                  Text('Failed to load notifications'),
-                  Text(
-                    error.toString(),
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-        data: (notifications) {
-          if (notifications.isEmpty) {
-            return Center(
-              child: FadeInSlide(
-                duration: 0.8,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.notifications_none_outlined,
-                      size: 80,
-                      color: Colors.grey[300],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No notifications yet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'We\'ll let you know when there are new\nlistings or matches for you.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey[500]),
-                    ),
-                  ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: notificationsAsync.when(
+            loading:
+                () => Center(
+                  child: CircularProgressIndicator(color: theme.primaryColor),
                 ),
-              ),
-            );
-          }
+            error:
+                (error, stack) => Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red[300],
+                      ),
+                      const SizedBox(height: 16),
+                      Text('Failed to load notifications'),
+                      Text(
+                        error.toString(),
+                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+            data: (notifications) {
+              if (notifications.isEmpty) {
+                return Center(
+                  child: FadeInSlide(
+                    duration: 0.8,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.notifications_none_outlined,
+                          size: 80,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'No notifications yet',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'We\'ll let you know when there are new\nlistings or matches for you.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey[500]),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: notifications.length,
-            itemBuilder: (context, index) {
-              final notification = notifications[index];
-              return FadeInSlide(
-                duration: 0.5,
-                delay: index * 0.05,
-                child: _buildNotificationCard(context, ref, notification),
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: notifications.length,
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  return FadeInSlide(
+                    duration: 0.5,
+                    delay: index * 0.05,
+                    child: _buildNotificationCard(context, ref, notification),
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -138,10 +147,7 @@ class NotificationScreen extends ConsumerWidget {
             context,
             MaterialPageRoute(
               builder:
-                  (context) => NotificationDetail(
-                    title: notification.title,
-                    body: notification.body,
-                  ),
+                  (context) => NotificationDetail(notification: notification),
             ),
           );
         },

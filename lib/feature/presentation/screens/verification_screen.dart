@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:camp_nest/feature/presentation/provider/verification_provider.dart';
 
 import 'package:flutter/material.dart';
@@ -25,8 +23,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
 
   // Document State
   String _selectedDocType = 'NIN Card';
-  File? _frontImage;
-  File? _backImage;
+  XFile? _frontImage;
+  XFile? _backImage;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -43,9 +41,9 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     if (image != null) {
       setState(() {
         if (isFront) {
-          _frontImage = File(image.path);
+          _frontImage = image;
         } else {
-          _backImage = File(image.path);
+          _backImage = image;
         }
       });
     }
@@ -148,143 +146,152 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Identity Verification')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionTitle(context, 'Personal Information'),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Full Name (as on ID)',
-                  hintText: 'Enter your full name',
-                ),
-                validator:
-                    (value) =>
-                        value == null || value.isEmpty
-                            ? 'Name is required'
-                            : null,
-              ),
-              const SizedBox(height: 16),
-              GestureDetector(
-                onTap: () => _selectDate(context),
-                child: AbsorbPointer(
-                  child: TextFormField(
-                    controller: _dobController,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle(context, 'Personal Information'),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _nameController,
                     decoration: const InputDecoration(
-                      labelText: 'Date of Birth',
-                      hintText: 'Select your date of birth',
-                      suffixIcon: Icon(Icons.calendar_today),
+                      labelText: 'Full Name (as on ID)',
+                      hintText: 'Enter your full name',
                     ),
                     validator:
                         (value) =>
                             value == null || value.isEmpty
-                                ? 'Date of Birth is required'
+                                ? 'Name is required'
                                 : null,
                   ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _ninController,
-                decoration: const InputDecoration(
-                  labelText: 'NIN Number',
-                  hintText: 'Enter your 11-digit NIN',
-                ),
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.isEmpty) return 'NIN is required';
-                  if (value.length != 11) return 'NIN must be 11 digits';
-                  return null;
-                },
-              ),
-
-              const SizedBox(height: 32),
-              _buildSectionTitle(context, 'Document Upload'),
-              const SizedBox(height: 16),
-
-              DropdownButtonFormField<String>(
-                value: _selectedDocType,
-                decoration: InputDecoration(
-                  labelText: 'Document Type',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                items:
-                    ['NIN Card', 'School ID'].map((type) {
-                      return DropdownMenuItem(value: type, child: Text(type));
-                    }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedDocType = value!;
-                  });
-                },
-              ),
-              const SizedBox(height: 16),
-
-              const Text(
-                'Front of ID (Required)',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              _buildImageUpload(
-                context,
-                _frontImage,
-                () => _pickImage(true),
-                'Tap to upload front image',
-              ),
-
-              const SizedBox(height: 16),
-              const Text(
-                'Back of ID (Optional)',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              _buildImageUpload(
-                context,
-                _backImage,
-                () => _pickImage(false),
-                'Tap to upload back image',
-              ),
-
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: state.isLoading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.primaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () => _selectDate(context),
+                    child: AbsorbPointer(
+                      child: TextFormField(
+                        controller: _dobController,
+                        decoration: const InputDecoration(
+                          labelText: 'Date of Birth',
+                          hintText: 'Select your date of birth',
+                          suffixIcon: Icon(Icons.calendar_today),
+                        ),
+                        validator:
+                            (value) =>
+                                value == null || value.isEmpty
+                                    ? 'Date of Birth is required'
+                                    : null,
+                      ),
                     ),
                   ),
-                  child:
-                      state.isLoading
-                          ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                          : const Text(
-                            'Submit for Verification',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _ninController,
+                    decoration: const InputDecoration(
+                      labelText: 'NIN Number',
+                      hintText: 'Enter your 11-digit NIN',
+                    ),
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return 'NIN is required';
+                      if (value.length != 11) return 'NIN must be 11 digits';
+                      return null;
+                    },
+                  ),
+
+                  const SizedBox(height: 32),
+                  _buildSectionTitle(context, 'Document Upload'),
+                  const SizedBox(height: 16),
+
+                  DropdownButtonFormField<String>(
+                    value: _selectedDocType,
+                    decoration: InputDecoration(
+                      labelText: 'Document Type',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    items:
+                        ['NIN Card', 'School ID'].map((type) {
+                          return DropdownMenuItem(
+                            value: type,
+                            child: Text(type),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedDocType = value!;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  const Text(
+                    'Front of ID (Required)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildImageUpload(
+                    context,
+                    _frontImage,
+                    () => _pickImage(true),
+                    'Tap to upload front image',
+                  ),
+
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Back of ID (Optional)',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildImageUpload(
+                    context,
+                    _backImage,
+                    () => _pickImage(false),
+                    'Tap to upload back image',
+                  ),
+
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: state.isLoading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.primaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child:
+                          state.isLoading
+                              ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                              : const Text(
+                                'Submit for Verification',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -308,7 +315,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
 
   Widget _buildImageUpload(
     BuildContext context,
-    File? image,
+    XFile? image,
     VoidCallback onTap,
     String placeholder,
   ) {
@@ -326,7 +333,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
             image != null
                 ? ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.file(image, fit: BoxFit.cover),
+                  child: Image.network(image.path, fit: BoxFit.cover),
                 )
                 : Column(
                   mainAxisAlignment: MainAxisAlignment.center,

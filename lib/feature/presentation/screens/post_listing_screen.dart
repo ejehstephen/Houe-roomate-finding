@@ -321,401 +321,406 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Post a Listing')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Image picker
-            GestureDetector(
-              onTap: _showImagePicker,
-              child: Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child:
-                    (!kIsWeb && _selectedImages.isEmpty) ||
-                            (kIsWeb && _selectedImageBytes.isEmpty)
-                        ? const Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.add_a_photo,
-                              size: 48,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              'Tap to Add Photos',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                            Text(
-                              '(Up to 5 images)',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        )
-                        : Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child:
-                                  kIsWeb
-                                      ? _isVideo(_selectedFilenames.first)
-                                          ? Container(
-                                            color: Colors.black,
-                                            height: 200,
-                                            width: double.infinity,
-                                            child: const Center(
-                                              child: Icon(
-                                                Icons.play_circle_outline,
-                                                color: Colors.white,
-                                                size: 64,
-                                              ),
-                                            ),
-                                          )
-                                          : Image.memory(
-                                            _selectedImageBytes.first,
-                                            width: double.infinity,
-                                            height: 200,
-                                            fit: BoxFit.cover,
-                                          )
-                                      : MediaDisplayWidget(
-                                        file: _selectedImages.first,
-                                        isThumbnail: true,
-                                        fit: BoxFit.cover,
-                                      ),
-                            ),
-                            Positioned(
-                              bottom: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // Image picker
+                GestureDetector(
+                  onTap: _showImagePicker,
+                  child: Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child:
+                        (!kIsWeb && _selectedImages.isEmpty) ||
+                                (kIsWeb && _selectedImageBytes.isEmpty)
+                            ? const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_a_photo,
+                                  size: 48,
+                                  color: Colors.grey,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black54,
-                                  borderRadius: BorderRadius.circular(12),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Tap to Add Photos',
+                                  style: TextStyle(color: Colors.grey),
                                 ),
-                                child: Text(
-                                  '${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length)} file${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length) > 1 ? 's' : ''}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                Text(
+                                  '(Up to 5 images)',
+                                  style: TextStyle(
+                                    color: Colors.grey,
                                     fontSize: 12,
                                   ),
                                 ),
-                              ),
-                            ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  color: Colors.black54,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-              ),
-            ),
-
-            // Show selected images
-            if ((!kIsWeb && _selectedImages.isNotEmpty) ||
-                (kIsWeb && _selectedImageBytes.isNotEmpty)) ...[
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 80,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount:
-                      kIsWeb
-                          ? _selectedImageBytes.length
-                          : _selectedImages.length,
-                  itemBuilder: (context, index) {
-                    final isVideo =
-                        kIsWeb
-                            ? _isVideo(_selectedFilenames[index])
-                            : _isVideo(_selectedImages[index].path);
-                    return Container(
-                      width: 80,
-                      margin: const EdgeInsets.only(right: 8),
-                      child: Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child:
-                                kIsWeb
-                                    ? isVideo
-                                        ? Container(
-                                          width: 80,
-                                          height: 80,
-                                          color: Colors.black,
-                                          child: const Center(
-                                            child: Icon(
-                                              Icons.videocam,
-                                              color: Colors.white,
-                                            ),
+                              ],
+                            )
+                            : Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child:
+                                      kIsWeb
+                                          ? _isVideo(_selectedFilenames.first)
+                                              ? Container(
+                                                color: Colors.black,
+                                                height: 200,
+                                                width: double.infinity,
+                                                child: const Center(
+                                                  child: Icon(
+                                                    Icons.play_circle_outline,
+                                                    color: Colors.white,
+                                                    size: 64,
+                                                  ),
+                                                ),
+                                              )
+                                              : Image.memory(
+                                                _selectedImageBytes.first,
+                                                width: double.infinity,
+                                                height: 200,
+                                                fit: BoxFit.cover,
+                                              )
+                                          : MediaDisplayWidget(
+                                            file: _selectedImages.first,
+                                            isThumbnail: true,
+                                            fit: BoxFit.cover,
                                           ),
-                                        )
-                                        : Image.memory(
-                                          _selectedImageBytes[index],
-                                          width: 80,
-                                          height: 80,
-                                          fit: BoxFit.cover,
-                                        )
-                                    : MediaDisplayWidget(
-                                      file: _selectedImages[index],
-                                      isThumbnail: true,
-                                      fit: BoxFit.cover,
-                                    ),
-                          ),
-                          Positioned(
-                            top: 4,
-                            right: 4,
-                            child: GestureDetector(
-                              onTap: () => _removeImage(index),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
-                                  Icons.close,
-                                  color: Colors.white,
-                                  size: 16,
+                                Positioned(
+                                  bottom: 8,
+                                  right: 8,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      '${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length)} file${(kIsWeb ? _selectedImageBytes.length : _selectedImages.length) > 1 ? 's' : ''}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  top: 8,
+                                  right: 8,
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.edit,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                  ),
+                ),
+
+                // Show selected images
+                if ((!kIsWeb && _selectedImages.isNotEmpty) ||
+                    (kIsWeb && _selectedImageBytes.isNotEmpty)) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 80,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount:
+                          kIsWeb
+                              ? _selectedImageBytes.length
+                              : _selectedImages.length,
+                      itemBuilder: (context, index) {
+                        final isVideo =
+                            kIsWeb
+                                ? _isVideo(_selectedFilenames[index])
+                                : _isVideo(_selectedImages[index].path);
+                        return Container(
+                          width: 80,
+                          margin: const EdgeInsets.only(right: 8),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child:
+                                    kIsWeb
+                                        ? isVideo
+                                            ? Container(
+                                              width: 80,
+                                              height: 80,
+                                              color: Colors.black,
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.videocam,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            )
+                                            : Image.memory(
+                                              _selectedImageBytes[index],
+                                              width: 80,
+                                              height: 80,
+                                              fit: BoxFit.cover,
+                                            )
+                                        : MediaDisplayWidget(
+                                          file: _selectedImages[index],
+                                          isThumbnail: true,
+                                          fit: BoxFit.cover,
+                                        ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () => _removeImage(index),
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
-                    );
+                        );
+                      },
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'e.g., Cozy Studio Near Campus',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
                   },
                 ),
-              ),
-            ],
 
-            const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                hintText: 'e.g., Cozy Studio Near Campus',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a title';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Describe your room/apartment...',
-              ),
-              maxLines: 3,
-              validator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter a description';
-                }
-                return null;
-              },
-            ),
-
-            const SizedBox(height: 16),
-
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _priceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Price per month',
-                      prefixText: '\N',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a price';
-                      }
-                      if (double.tryParse(value) == null) {
-                        return 'Please enter a valid number';
-                      }
-                      return null;
-                    },
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Describe your room/apartment...',
                   ),
+                  maxLines: 3,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a description';
+                    }
+                    return null;
+                  },
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: TextFormField(
-                    controller: _locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Location',
-                      hintText: 'e.g., Downtown',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter a location';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
 
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-            // Owner phone
-            TextFormField(
-              controller: _ownerPhoneController,
-              decoration: const InputDecoration(
-                labelText: 'whatsapp phone ',
-                hintText: '+234',
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-
-            const SizedBox(height: 24),
-
-            const Text(
-              'Gender Preference',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children:
-                  ['any', 'male', 'female'].map((gender) {
-                    return ChoiceChip(
-                      label: Text(
-                        gender == 'any' ? 'Any' : gender.toUpperCase(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _priceController,
+                        decoration: const InputDecoration(
+                          labelText: 'Price per month',
+                          prefixText: '\N',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a price';
+                          }
+                          if (double.tryParse(value) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
                       ),
-                      selected: _selectedGender == gender,
-                      onSelected: (selected) {
-                        if (selected) {
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _locationController,
+                        decoration: const InputDecoration(
+                          labelText: 'Location',
+                          hintText: 'e.g., Downtown',
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter a location';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Owner phone
+                TextFormField(
+                  controller: _ownerPhoneController,
+                  decoration: const InputDecoration(
+                    labelText: 'whatsapp phone ',
+                    hintText: '+234',
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Gender Preference',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children:
+                      ['any', 'male', 'female'].map((gender) {
+                        return ChoiceChip(
+                          label: Text(
+                            gender == 'any' ? 'Any' : gender.toUpperCase(),
+                          ),
+                          selected: _selectedGender == gender,
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedGender = gender;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                ),
+
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Amenities',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children:
+                      _availableAmenities.map((amenity) {
+                        return FilterChip(
+                          label: Text(amenity),
+                          selected: _selectedAmenities.contains(amenity),
+                          onSelected: (selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedAmenities.add(amenity);
+                              } else {
+                                _selectedAmenities.remove(amenity);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                ),
+
+                // const SizedBox(height: ),
+                const Text(
+                  'House Rules',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _ruleController,
+                        decoration: const InputDecoration(
+                          hintText: 'Add a rule...',
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        if (_ruleController.text.isNotEmpty) {
                           setState(() {
-                            _selectedGender = gender;
+                            _rules.add(_ruleController.text);
+                            _ruleController.clear();
                           });
                         }
                       },
-                    );
-                  }).toList(),
-            ),
-
-            const SizedBox(height: 24),
-
-            const Text(
-              'Amenities',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children:
-                  _availableAmenities.map((amenity) {
-                    return FilterChip(
-                      label: Text(amenity),
-                      selected: _selectedAmenities.contains(amenity),
-                      onSelected: (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedAmenities.add(amenity);
-                          } else {
-                            _selectedAmenities.remove(amenity);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-            ),
-
-            // const SizedBox(height: ),
-            const Text(
-              'House Rules',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ruleController,
-                    decoration: const InputDecoration(
-                      hintText: 'Add a rule...',
+                      icon: const Icon(Icons.add),
                     ),
-                  ),
+                  ],
                 ),
-                IconButton(
-                  onPressed: () {
-                    if (_ruleController.text.isNotEmpty) {
-                      setState(() {
-                        _rules.add(_ruleController.text);
-                        _ruleController.clear();
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.add),
+
+                if (_rules.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        _rules
+                            .map(
+                              (rule) => Chip(
+                                label: Text(rule),
+                                onDeleted: () {
+                                  setState(() {
+                                    _rules.remove(rule);
+                                  });
+                                },
+                              ),
+                            )
+                            .toList(),
+                  ),
+                ],
+
+                const SizedBox(height: 32),
+
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _submitListing,
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text('Post Listing'),
                 ),
               ],
             ),
-
-            if (_rules.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children:
-                    _rules
-                        .map(
-                          (rule) => Chip(
-                            label: Text(rule),
-                            onDeleted: () {
-                              setState(() {
-                                _rules.remove(rule);
-                              });
-                            },
-                          ),
-                        )
-                        .toList(),
-              ),
-            ],
-
-            const SizedBox(height: 32),
-
-            ElevatedButton(
-              onPressed: _isLoading ? null : _submitListing,
-              child:
-                  _isLoading
-                      ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                      : const Text('Post Listing'),
-            ),
-          ],
+          ),
         ),
       ),
     );

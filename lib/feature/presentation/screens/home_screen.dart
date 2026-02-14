@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:camp_nest/core/service/auth_service.dart';
 import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
@@ -21,63 +22,66 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
+  Timer? _verificationTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Load listings when home screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _initializeWithTokenCheck();
+      _startVerificationCheckTimer();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _verificationTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startVerificationCheckTimer() {
+    _verificationTimer?.cancel();
+    _verificationTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      final user = ref.read(authProvider).user;
+      if (user != null && !user.isVerified) {
+        print('⏳ Polling for verification status...');
+        ref.read(authProvider.notifier).refreshUser();
+      } else {
+        // User is verified or logged out, stop polling
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Refresh user data AND listings when app comes to foreground
+      print('📱 App resumed - refreshing user data and listings...');
+      ref.read(authProvider.notifier).refreshUser();
+      ref.read(listingsProvider.notifier).loadAllListings();
+    }
   }
 
   Future<void> _initializeWithTokenCheck() async {
     print('🏠 DEBUG HomeScreen: Starting initialization...');
 
-    // First check if token is available
-    final authService = AuthService();
-    final token = await authService.getToken();
+    // Set school on the listings provider so it filters correctly
+    final user = ref.read(authProvider).user;
+    ref.read(listingsProvider.notifier).setSchool(user?.school);
 
-    if (token == null) {
-      print('⏳ DEBUG HomeScreen: No token yet, waiting...');
-      // Wait a bit for token to become available
-      await Future.delayed(const Duration(milliseconds: 1000));
-
-      final retryToken = await authService.getToken();
-      if (retryToken != null) {
-        print(
-          '✅ DEBUG HomeScreen: Token available after wait, clearing error and loading listings',
-        );
-        // Check if widget is still mounted before using ref
-        if (!mounted) return;
-
-        // Force clear any existing error state first
-        ref.read(listingsProvider.notifier).clearError();
-        // Then reload listings
-        ref.read(listingsProvider.notifier).loadAllListings();
-      } else {
-        print(
-          '❌ DEBUG HomeScreen: Still no token, proceeding with load (will show error)',
-        );
-        // Check if widget is still mounted before using ref
-        if (!mounted) return;
-
-        ref.read(listingsProvider.notifier).loadAllListings();
-      }
-    } else {
-      print(
-        '✅ DEBUG HomeScreen: Token available immediately, clearing error and loading listings',
-      );
-      // Check if widget is still mounted before using ref
-      if (!mounted) return;
-
-      // Clear any existing error state first
-      ref.read(listingsProvider.notifier).clearError();
-      // Then load listings
-      ref.read(listingsProvider.notifier).loadAllListings();
-    }
+    // Note: ListingsProvider auto-loads in constructor, no need to call loadAllListings() here
+    // Note: refreshUser() already called in signIn(), no need to duplicate
 
     await _debugTokenStatus();
   }
@@ -194,15 +198,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final horizontalPadding = constraints.maxWidth > 600 ? 32.0 : 20.0;
-          const maxContentWidth = 1200.0;
 
           return SafeArea(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: maxContentWidth),
+                constraints: const BoxConstraints(maxWidth: 600),
                 child: RefreshIndicator(
                   onRefresh: () async {
-                    ref.read(listingsProvider.notifier).loadAllListings();
+                    // Refresh both listings and user data (to check verification status)
+                    await Future.wait([
+                      ref.read(listingsProvider.notifier).loadAllListings(),
+                      ref.read(authProvider.notifier).refreshUser(),
+                    ]);
                   },
                   child: Padding(
                     padding: EdgeInsets.symmetric(
@@ -336,18 +343,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                               context,
                                             ).textTheme.titleLarge,
                                       ),
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.of(context).push(
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (context) =>
-                                                      const ListingsScreen(),
-                                            ),
-                                          );
-                                        },
-                                        child: const Text('See All'),
-                                      ),
+                                      // TextButton(
+                                      //   onPressed: () {
+                                      //     Navigator.of(context).push(
+                                      //       MaterialPageRoute(
+                                      //         builder:
+                                      //             (context) =>
+                                      //                 const ListingsScreen(),
+                                      //       ),
+                                      //     );
+                                      //   },
+                                      //   child: const Text('See All'),
+                                      // ),
                                     ],
                                   ),
                                 ),
@@ -402,7 +409,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'No rooms found',
+                                    'No rooms found \n pull to refresh',
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleMedium
@@ -427,7 +434,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       0.1 * (index + 1), // Staggered animation
                                   child: Container(
                                     width: double.infinity,
-                                    height: 400,
+                                    height: 470,
                                     margin: const EdgeInsets.only(bottom: 24),
                                     child: RoomCard(listing: listing),
                                   ),
@@ -444,99 +451,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           );
         },
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 20,
-              offset: const Offset(0, -5),
+      bottomNavigationBar: Align(
+        alignment: Alignment.topCenter,
+        heightFactor: 1.0,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Container(
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 20,
+                  offset: const Offset(0, -5),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          selectedItemColor: Theme.of(context).primaryColor,
-          unselectedItemColor: Colors.grey[400],
-          showUnselectedLabels: true,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-          onTap: (index) {
-            if (index == 1) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const ListingsScreen()),
-              );
-            } else if (index == 2) {
-              final user = ref.read(authProvider).user;
-              if (user?.isVerified == true) {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const PostListingScreen(),
-                  ),
-                );
-              } else {
-                showDialog(
-                  context: context,
-                  builder:
-                      (context) => AlertDialog(
-                        title: const Text('Verification Required'),
-                        content: const Text(
-                          'To ensure trust and safety, you must verify your identity before posting a room listing.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          FilledButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => const VerificationScreen(),
-                                ), // Needs import
-                              );
-                            },
-                            child: const Text('Verify Identity'),
-                          ),
-                        ],
+            child: BottomNavigationBar(
+              currentIndex: _currentIndex,
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              selectedItemColor: Theme.of(context).primaryColor,
+              unselectedItemColor: Colors.grey[400],
+              showUnselectedLabels: true,
+              type: BottomNavigationBarType.fixed,
+              elevation: 0,
+              onTap: (index) {
+                if (index == 1) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ListingsScreen(),
+                    ),
+                  );
+                } else if (index == 2) {
+                  final user = ref.read(authProvider).user;
+                  if (user?.isVerified == true) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const PostListingScreen(),
                       ),
-                );
-              }
-            } else if (index == 3) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            } else {
-              setState(() {
-                _currentIndex = index;
-              });
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Home',
+                    );
+                  } else {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text('Verification Required'),
+                            content: const Text(
+                              'To ensure trust and safety, you must verify your identity before posting a room listing.',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) =>
+                                              const VerificationScreen(),
+                                    ), // Needs import
+                                  );
+                                },
+                                child: const Text('Verify Identity'),
+                              ),
+                            ],
+                          ),
+                    );
+                  }
+                } else if (index == 3) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ProfileScreen(),
+                    ),
+                  );
+                } else {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                }
+              },
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.search),
+                  activeIcon: Icon(Icons.search_rounded),
+                  label: 'Browse',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.add_box_outlined),
+                  activeIcon: Icon(Icons.add_box),
+                  label: "Post",
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person_outline),
+                  activeIcon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              activeIcon: Icon(Icons.search_rounded),
-              label: 'Browse',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.add_box_outlined),
-              activeIcon: Icon(Icons.add_box),
-              label: "Post",
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Profile',
-            ),
-          ],
+          ),
         ),
       ),
     );

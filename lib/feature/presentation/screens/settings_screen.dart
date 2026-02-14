@@ -22,80 +22,87 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), centerTitle: true),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          // Appearance Section
-          FadeInSlide(
-            duration: 0.5,
-            child: _buildSectionHeader(context, 'Appearance'),
-          ),
-          const SizedBox(height: 8),
-          FadeInSlide(
-            duration: 0.5,
-            delay: 0.1,
-            child: _buildSettingsTile(
-              context,
-              icon: isDark ? Icons.dark_mode : Icons.light_mode,
-              title: 'Dark Mode',
-              trailing: Switch.adaptive(
-                value: isDark,
-                onChanged: (value) {
-                  ref
-                      .read(themeProvider.notifier)
-                      .setThemeMode(value ? ThemeMode.dark : ThemeMode.light);
-                },
-                activeColor: theme.primaryColor,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              // Appearance Section
+              FadeInSlide(
+                duration: 0.5,
+                child: _buildSectionHeader(context, 'Appearance'),
               ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          // Account Section
-          FadeInSlide(
-            duration: 0.5,
-            delay: 0.2,
-            child: _buildSectionHeader(context, 'Account'),
-          ),
-          const SizedBox(height: 8),
-          FadeInSlide(
-            duration: 0.5,
-            delay: 0.3,
-            child: _buildSettingsTile(
-              context,
-              icon: Icons.lock_outline,
-              title: 'Change Password',
-              onTap: () => _showChangePasswordDialog(context),
-            ),
-          ),
-          const SizedBox(height: 12),
-          FadeInSlide(
-            duration: 0.5,
-            delay: 0.4,
-            child: _buildSettingsTile(
-              context,
-              icon: Icons.delete_forever,
-              title: 'Delete Account',
-              isDestructive: true,
-              onTap: () => _showDeleteAccountDialog(context),
-            ),
-          ),
-
-          const SizedBox(height: 48),
-
-          // App Info
-          FadeInSlide(
-            duration: 0.5,
-            delay: 0.5,
-            child: Center(
-              child: Text(
-                'CampNest v1.0.0',
-                style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              const SizedBox(height: 8),
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.1,
+                child: _buildSettingsTile(
+                  context,
+                  icon: isDark ? Icons.dark_mode : Icons.light_mode,
+                  title: 'Dark Mode',
+                  trailing: Switch.adaptive(
+                    value: isDark,
+                    onChanged: (value) {
+                      ref
+                          .read(themeProvider.notifier)
+                          .setThemeMode(
+                            value ? ThemeMode.dark : ThemeMode.light,
+                          );
+                    },
+                    activeColor: theme.primaryColor,
+                  ),
+                ),
               ),
-            ),
+
+              const SizedBox(height: 32),
+
+              // Account Section
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.2,
+                child: _buildSectionHeader(context, 'Account'),
+              ),
+              const SizedBox(height: 8),
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.3,
+                child: _buildSettingsTile(
+                  context,
+                  icon: Icons.lock_outline,
+                  title: 'Change Password',
+                  onTap: () => _showChangePasswordDialog(context),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.4,
+                child: _buildSettingsTile(
+                  context,
+                  icon: Icons.delete_forever,
+                  title: 'Delete Account',
+                  isDestructive: true,
+                  onTap: () => _showDeleteAccountDialog(context),
+                ),
+              ),
+
+              const SizedBox(height: 48),
+
+              // App Info
+              FadeInSlide(
+                duration: 0.5,
+                delay: 0.5,
+                child: Center(
+                  child: Text(
+                    'CampNest v1.0.0',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -193,84 +200,128 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirmPasswordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
+    bool _currentVisible = false;
+    bool _newVisible = false;
+    bool _confirmVisible = false;
+
     showDialog(
       context: context,
       builder:
-          (ctx) => AlertDialog(
-            title: const Text('Change Password'),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: currentPasswordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Current Password',
-                      prefixIcon: Icon(Icons.lock),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your current password';
-                      }
-                      return null;
-                    },
+          (ctx) => StatefulBuilder(
+            builder: (context, setState) {
+              return AlertDialog(
+                title: const Text('Change Password'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                content: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: currentPasswordController,
+                        obscureText: !_currentVisible,
+                        decoration: InputDecoration(
+                          labelText: 'Current Password',
+                          prefixIcon: const Icon(Icons.lock),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _currentVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _currentVisible = !_currentVisible;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter your current password';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: newPasswordController,
+                        obscureText: !_newVisible,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _newVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _newVisible = !_newVisible;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: confirmPasswordController,
+                        obscureText: !_confirmVisible,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          prefixIcon: const Icon(Icons.lock_outline),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _confirmVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _confirmVisible = !_confirmVisible;
+                              });
+                            },
+                          ),
+                        ),
+                        validator: (value) {
+                          if (value != newPasswordController.text) {
+                            return 'Passwords do not match';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: newPasswordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'New Password',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
-                      return null;
-                    },
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: confirmPasswordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirm New Password',
-                      prefixIcon: Icon(Icons.lock_outline),
-                    ),
-                    validator: (value) {
-                      if (value != newPasswordController.text) {
-                        return 'Passwords do not match';
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (formKey.currentState?.validate() ?? false) {
+                        Navigator.pop(ctx);
+                        await _changePassword(
+                          currentPasswordController.text,
+                          newPasswordController.text,
+                        );
                       }
-                      return null;
                     },
+                    child: const Text('Update'),
                   ),
                 ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  if (formKey.currentState?.validate() ?? false) {
-                    Navigator.pop(ctx);
-                    await _changePassword(
-                      currentPasswordController.text,
-                      newPasswordController.text,
-                    );
-                  }
-                },
-                child: const Text('Update'),
-              ),
-            ],
+              );
+            },
           ),
     );
   }

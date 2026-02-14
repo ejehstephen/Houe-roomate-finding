@@ -2,6 +2,7 @@ import 'package:camp_nest/feature/admin/provider/admin_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 class AdminListingsTab extends ConsumerStatefulWidget {
   const AdminListingsTab({super.key});
@@ -126,7 +127,7 @@ class _AdminListingsTabState extends ConsumerState<AdminListingsTab> {
                               : const Icon(Icons.home),
                       title: Text(listing.title),
                       subtitle: Text(
-                        '${listing.location}\nPrice: N${listing.price}',
+                        '${listing.location}\nPrice: ₦${NumberFormat('#,###').format(listing.price.toInt())}',
                       ),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,

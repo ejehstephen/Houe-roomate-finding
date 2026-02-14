@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:camp_nest/core/service/verification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,8 +24,8 @@ class VerificationNotifier extends StateNotifier<AsyncValue<void>> {
     required DateTime dateOfBirth,
     required String ninNumber,
     required String documentType,
-    required File frontImage,
-    File? backImage,
+    required XFile frontImage,
+    XFile? backImage,
   }) async {
     state = const AsyncValue.loading();
     try {

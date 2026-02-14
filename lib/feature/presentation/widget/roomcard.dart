@@ -2,6 +2,7 @@ import 'package:camp_nest/feature/presentation/widget/Media.dart';
 import 'package:camp_nest/core/model/room_listing.dart';
 import 'package:camp_nest/feature/presentation/screens/roomate_detailed.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class RoomCard extends StatelessWidget {
   final RoomListingModel listing;
@@ -38,7 +39,7 @@ class RoomCard extends StatelessWidget {
             children: [
               // Image Section
               SizedBox(
-                height: 320,
+                height: 350,
                 width: double.infinity,
                 child: Stack(
                   children: [
@@ -65,7 +66,7 @@ class RoomCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          'N${listing.price.toInt()}/yr',
+                          '₦${NumberFormat('#,###').format(listing.price.toInt())}/yr',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,

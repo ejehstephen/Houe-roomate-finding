@@ -36,9 +36,32 @@ class AdminService {
   Future<void> banUser(String userId) async {
     try {
       await _client.rpc('admin_ban_user', params: {'target_user_id': userId});
+
+      // Notify user
+      await sendNotification(
+        userId,
+        'Account Suspended',
+        'Your account has been suspended for violating community guidelines. Please contact support if you believe this is an error.',
+      );
     } catch (e) {
       print('Error banning user: $e');
       throw Exception('Failed to ban user');
+    }
+  }
+
+  Future<void> unbanUser(String userId) async {
+    try {
+      await _client.rpc('admin_unban_user', params: {'target_user_id': userId});
+
+      // Notify user
+      await sendNotification(
+        userId,
+        'Account Restored',
+        'Your account has been restored. You can now access all features again.',
+      );
+    } catch (e) {
+      print('Error unbanning user: $e');
+      throw Exception('Failed to unban user');
     }
   }
 
@@ -244,11 +267,8 @@ class AdminService {
 
       final userId = response['user_id'];
 
-      // 2. Update user's is_verified status
-      await _client
-          .from('users')
-          .update({'is_verified': true})
-          .eq('id', userId);
+      // 2. Update user's is_verified status via RPC (bypasses RLS)
+      await verifyUser(userId);
 
       // 3. Notify user
       await sendNotification(

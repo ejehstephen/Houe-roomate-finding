@@ -30,6 +30,22 @@ BEGIN
 END;
 $$;
 
+-- Function to unban a user
+CREATE OR REPLACE FUNCTION admin_unban_user(target_user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin') THEN
+    RAISE EXCEPTION 'Access Denied: Only admins can unban users';
+  END IF;
+
+  UPDATE public.users SET is_banned = false WHERE id = target_user_id;
+  UPDATE public.room_listings SET is_active = true WHERE owner_id = target_user_id;
+END;
+$$;
+
 -- Function to verify a user
 CREATE OR REPLACE FUNCTION admin_verify_user(target_user_id uuid)
 RETURNS void
@@ -120,6 +136,7 @@ $$;
 
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION admin_ban_user TO authenticated;
+GRANT EXECUTE ON FUNCTION admin_unban_user TO authenticated;
 GRANT EXECUTE ON FUNCTION admin_verify_user TO authenticated;
 GRANT EXECUTE ON FUNCTION admin_feature_listing TO authenticated;
 GRANT EXECUTE ON FUNCTION admin_delete_listing TO authenticated;

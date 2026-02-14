@@ -58,12 +58,11 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                   : isTablet
                   ? 20.0
                   : 16.0;
-          const maxContentWidth = 1200.0;
 
           return SafeArea(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: maxContentWidth),
+                constraints: const BoxConstraints(maxWidth: 600),
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                   child: CustomScrollView(

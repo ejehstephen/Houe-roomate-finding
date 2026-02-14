@@ -33,7 +33,8 @@ class RoommateCard extends ConsumerWidget {
                     context,
                   ).primaryColor.withOpacity(0.2),
                   backgroundImage: _resolveAvatarImage(),
-                  onBackgroundImageError: (_, __) {},
+                  onBackgroundImageError:
+                      _resolveAvatarImage() != null ? (_, __) {} : null,
                   child: _resolveAvatarChild(),
                 ),
                 const SizedBox(width: 16),
