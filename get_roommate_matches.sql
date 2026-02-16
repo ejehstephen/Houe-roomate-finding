@@ -132,9 +132,14 @@ BEGIN
     FROM questionnaire_answers qa
     JOIN answer_values av ON av.answer_id = qa.id
     WHERE qa.question_id NOT IN (
-      '22222222-2222-2222-2222-222222222222'::UUID,
-      '55555555-5555-5555-5555-555555555555'::UUID,
-      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID
+      '22222222-2222-2222-2222-222222222222'::UUID, -- Cleanliness
+      '33333333-3333-3333-3333-333333333333'::UUID, -- Sleep
+      '44444444-4444-4444-4444-444444444444'::UUID, -- Social
+      '55555555-5555-5555-5555-555555555555'::UUID, -- Habits
+      '66666666-6666-6666-6666-666666666666'::UUID, -- Guests
+      '77777777-7777-7777-7777-777777777777'::UUID, -- Study
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'::UUID, -- Friendship
+      'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'::UUID  -- Apartment
     )
   ),
   interest_overlap AS (
@@ -170,7 +175,7 @@ BEGIN
 
       -- Cleanliness score (35%)
       CASE
-        WHEN v_my_cleanliness IS NULL OR cc.clean_answer IS NULL THEN 50
+        WHEN cc.clean_answer IS NULL THEN 0 -- Must have answered
         ELSE GREATEST(0, 100 - 25 * ABS(
           (CASE v_my_cleanliness
             WHEN 'Very messy' THEN 1 WHEN 'Somewhat messy' THEN 2
@@ -184,7 +189,7 @@ BEGIN
 
       -- Habits score (35%)
       CASE
-        WHEN v_my_habits IS NULL OR ch.habit_answer IS NULL THEN 50
+        WHEN ch.habit_answer IS NULL THEN 0 -- Must have answered
         WHEN v_my_habits = ch.habit_answer THEN 100
         WHEN v_my_habits = 'Neither' AND ch.habit_answer = 'Regularly' THEN 0
         WHEN v_my_habits = 'Neither' AND ch.habit_answer ILIKE '%occasionally%' THEN 40
@@ -200,7 +205,10 @@ BEGIN
         ELSE LEAST(100, ROUND((COALESCE(io.overlap_count, 0)::NUMERIC / mac.total) * 200))
       END AS interest_score,
 
-      COALESCE(cia_agg.interests, '[]'::JSONB) AS common_interests_json
+      ca.apt_answer,
+      cc.clean_answer,
+      ch.habit_answer,
+      COALESCE(cia_agg.interests, '[]'::jsonb) AS common_interests
 
     FROM candidates cand
     LEFT JOIN candidate_apartment ca ON ca.user_id = cand.id
@@ -209,11 +217,22 @@ BEGIN
     LEFT JOIN interest_overlap io ON io.user_id = cand.id
     LEFT JOIN common_interests_agg cia_agg ON cia_agg.user_id = cand.id
     CROSS JOIN my_answer_count mac
-    -- Apartment filter: opposite status (one has, one needs)
-    WHERE (
-      (v_my_apartment IS NULL OR ca.apt_answer IS NULL)
-      OR (v_my_apartment != ca.apt_answer)
-    )
+    WHERE
+      -- QUIZ RULE: Must have answered Cleanliness & Habits to be matched
+      cc.clean_answer IS NOT NULL
+      AND ch.habit_answer IS NOT NULL
+
+      -- APARTMENT RULE:
+      -- If I have an apartment ('Yes'), I want someone who does NOT ('No').
+      -- If I do NOT have an apartment ('No'), I want someone who DOES ('Yes').
+      AND (
+        (v_my_apartment = 'Yes' AND ca.apt_answer = 'No')
+        OR
+        (v_my_apartment = 'No' AND ca.apt_answer = 'Yes')
+        -- If I didn't answer apartment question, maybe show everyone?
+        -- But user asked for STRICT rule. So let's enforcing matching apt status.
+        -- Assuming v_my_apartment is not null (handled in step 2 of SQL)
+      )
   )
   SELECT
     s.match_id,
@@ -228,7 +247,7 @@ BEGIN
       (s.habits_score * 0.35) +
       (s.interest_score * 0.30)
     )::INT AS compat_score,
-    s.common_interests_json,
+    s.common_interests,
     0.0::FLOAT AS budget_val,
     '[]'::JSONB AS prefs
   FROM scored s

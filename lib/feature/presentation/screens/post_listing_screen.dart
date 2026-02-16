@@ -10,6 +10,8 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:camp_nest/feature/presentation/widget/Media.dart';
+import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
+import 'package:camp_nest/feature/presentation/screens/verification_screen.dart';
 
 class PostListingScreen extends ConsumerStatefulWidget {
   const PostListingScreen({super.key});
@@ -103,9 +105,9 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 80,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 70,
       );
       if (image == null) return;
 
@@ -126,7 +128,8 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
         });
       }
     } catch (e) {
-      e.showError(context, duration: const Duration(seconds: 4));
+      // Handle error
+      print('Error taking picture: $e');
     }
   }
 
@@ -267,6 +270,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
           gender: _selectedGender,
           availableFrom: DateTime.now().add(const Duration(days: 7)),
           school: user.school,
+          isOwnerVerified: user.isVerified,
         );
 
         print('Creating listing with images: ${listing.images}');
@@ -329,6 +333,85 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Trust Banner
+                Consumer(
+                  builder: (context, ref, _) {
+                    final user = ref.watch(authProvider).user;
+                    if (user == null || user.isVerified) {
+                      return const SizedBox.shrink();
+                    }
+                    return FadeInSlide(
+                      duration: 0.5,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 24),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.verified_user_outlined,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Get Verified for Trust!',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Verified listings get 3x more views and trust.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => const VerificationScreen(),
+                                  ),
+                                );
+                              },
+                              child: const Text('Verify'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
                 // Image picker
                 GestureDetector(
                   onTap: _showImagePicker,

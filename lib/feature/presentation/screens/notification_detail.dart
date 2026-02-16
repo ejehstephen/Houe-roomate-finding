@@ -135,10 +135,18 @@ class NotificationDetail extends ConsumerWidget {
                         );
 
                         try {
-                          final listingId = data['listing_id'];
+                          final listingId = data['listing_id'].toString();
+                          print(
+                            '🔔 NotificationDetail: Fetching listing $listingId',
+                          );
+
                           final listing = await ref
                               .read(listingsServiceProvider)
                               .getListingById(listingId);
+
+                          print(
+                            '🔔 NotificationDetail: Fetch result: ${listing != null ? "Found" : "Null"}',
+                          );
 
                           if (context.mounted) {
                             Navigator.pop(context); // Dismiss loading

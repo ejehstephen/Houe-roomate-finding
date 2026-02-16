@@ -45,6 +45,10 @@ class ListingsService {
       if (map['owner'] != null) {
         map['ownerName'] = map['owner']['name'];
         map['ownerPhone'] = map['owner']['phone_number'];
+        // Use the owner's verification status from the users table
+        if (map['owner']['is_verified'] == true) {
+          map['is_owner_verified'] = true;
+        }
       }
 
       return RoomListingModel.fromJson(map);
@@ -62,7 +66,7 @@ class ListingsService {
             room_listing_images (images),
             room_listing_amenities (amenities),
             room_listing_rules (rules),
-            owner:users!room_listings_owner_id_fkey (name, phone_number)
+            owner:users!room_listings_owner_id_fkey (name, phone_number, is_verified)
           ''')
               .eq('id', id)
               .single();
@@ -76,7 +80,11 @@ class ListingsService {
   }
 
   // Get all active listings
-  Future<List<RoomListingModel>> getAllListings({String? school}) async {
+  Future<List<RoomListingModel>> getAllListings({
+    String? school,
+    int page = 0,
+    int pageSize = 10,
+  }) async {
     try {
       dynamic query = _client
           .from('room_listings')
@@ -85,7 +93,7 @@ class ListingsService {
             room_listing_images (images),
             room_listing_amenities (amenities),
             room_listing_rules (rules),
-            owner:users!room_listings_owner_id_fkey (name, phone_number)
+            owner:users!room_listings_owner_id_fkey (name, phone_number, is_verified)
           ''')
           .eq('is_active', true);
 
@@ -93,9 +101,25 @@ class ListingsService {
         query = query.ilike('school', '%${school.trim()}%');
       }
 
-      final response = await query.order('created_at', ascending: false);
+      final from = page * pageSize;
+      final to = from + pageSize - 1;
 
-      return _transformData(response as List);
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(from, to);
+
+      final List<RoomListingModel> listings = _transformData(response as List);
+
+      // Sort: Verified first, then newer listings (using ID as timestamp proxy)
+      listings.sort((a, b) {
+        if (a.isOwnerVerified != b.isOwnerVerified) {
+          return a.isOwnerVerified ? -1 : 1;
+        }
+        // Secondary sort: Newest first (descending ID)
+        return b.id.compareTo(a.id);
+      });
+
+      return listings;
     } catch (e) {
       print('Error fetching listings: $e');
       throw Exception('Failed to fetch listings');
@@ -120,7 +144,17 @@ class ListingsService {
           .eq('owner_id', user.id)
           .order('created_at', ascending: false);
 
-      return _transformData(response as List);
+      final List<RoomListingModel> listings = _transformData(response as List);
+
+      // Sort: Verified first, then newer listings
+      listings.sort((a, b) {
+        if (a.isOwnerVerified != b.isOwnerVerified) {
+          return a.isOwnerVerified ? -1 : 1;
+        }
+        return b.id.compareTo(a.id);
+      });
+
+      return listings;
     } catch (e) {
       print('Error fetching my listings: $e');
       throw Exception('Failed to fetch my listings');
@@ -148,7 +182,7 @@ class ListingsService {
             room_listing_images (images),
             room_listing_amenities (amenities),
             room_listing_rules (rules),
-            owner:users!room_listings_owner_id_fkey (name, phone_number)
+            owner:users!room_listings_owner_id_fkey (name, phone_number, is_verified)
           ''')
           .eq('is_active', true);
 
@@ -199,7 +233,17 @@ class ListingsService {
       }
 
       final response = await dbQuery;
-      return _transformData(response as List);
+      final List<RoomListingModel> listings = _transformData(response as List);
+
+      // Sort: Verified first, then newer listings
+      listings.sort((a, b) {
+        if (a.isOwnerVerified != b.isOwnerVerified) {
+          return a.isOwnerVerified ? -1 : 1;
+        }
+        return b.id.compareTo(a.id);
+      });
+
+      return listings;
     } catch (e) {
       print('Error searching listings: $e');
       return [];

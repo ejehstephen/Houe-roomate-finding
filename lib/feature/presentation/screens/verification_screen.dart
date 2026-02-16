@@ -3,7 +3,6 @@ import 'package:camp_nest/feature/presentation/provider/verification_provider.da
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 
 class VerificationScreen extends ConsumerStatefulWidget {
   const VerificationScreen({super.key});
@@ -17,12 +16,11 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
 
   // Controllers
   final _nameController = TextEditingController();
-  final _ninController = TextEditingController();
-  final _dobController = TextEditingController(); // Just for display
-  DateTime? _selectedDate;
 
   // Document State
-  String _selectedDocType = 'NIN Card';
+
+  // Document State
+  String _selectedDocType = 'School ID';
   XFile? _frontImage;
   XFile? _backImage;
 
@@ -31,8 +29,6 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _ninController.dispose();
-    _dobController.dispose();
     super.dispose();
   }
 
@@ -49,31 +45,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().subtract(
-        const Duration(days: 365 * 18),
-      ), // Default 18 years ago
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-    );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-        _dobController.text = DateFormat('yyyy-MM-dd').format(picked);
-      });
-    }
-  }
-
   void _submit() async {
     if (_formKey.currentState!.validate()) {
-      if (_selectedDate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select your Date of Birth')),
-        );
-        return;
-      }
       if (_frontImage == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -87,8 +60,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
           .read(verificationNotifierProvider.notifier)
           .submitVerification(
             fullName: _nameController.text.trim(),
-            dateOfBirth: _selectedDate!,
-            ninNumber: _ninController.text.trim(),
+            ninNumber: 'N/A', // NIN removed as requirement
             documentType: _selectedDocType,
             frontImage: _frontImage!,
             backImage: _backImage,
@@ -171,39 +143,8 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                                 : null,
                   ),
                   const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: () => _selectDate(context),
-                    child: AbsorbPointer(
-                      child: TextFormField(
-                        controller: _dobController,
-                        decoration: const InputDecoration(
-                          labelText: 'Date of Birth',
-                          hintText: 'Select your date of birth',
-                          suffixIcon: Icon(Icons.calendar_today),
-                        ),
-                        validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Date of Birth is required'
-                                    : null,
-                      ),
-                    ),
-                  ),
+
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _ninController,
-                    decoration: const InputDecoration(
-                      labelText: 'NIN Number',
-                      hintText: 'Enter your 11-digit NIN',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.isEmpty)
-                        return 'NIN is required';
-                      if (value.length != 11) return 'NIN must be 11 digits';
-                      return null;
-                    },
-                  ),
 
                   const SizedBox(height: 32),
                   _buildSectionTitle(context, 'Document Upload'),
@@ -218,7 +159,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                       ),
                     ),
                     items:
-                        ['NIN Card', 'School ID'].map((type) {
+                        ['School ID', 'Selfie'].map((type) {
                           return DropdownMenuItem(
                             value: type,
                             child: Text(type),

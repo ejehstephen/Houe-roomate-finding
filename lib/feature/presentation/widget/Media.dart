@@ -1,9 +1,11 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+
 import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:camp_nest/core/service/auth_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:chewie/chewie.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class MediaDisplayWidget extends StatefulWidget {
   final String? mediaUrl;
@@ -127,6 +129,8 @@ class _MediaDisplayWidgetState extends State<MediaDisplayWidget> {
   }
 
   void _setupControllers() {
+    if (_videoController == null) return;
+
     if (widget.isThumbnail) {
       // Just initialize, don't play
       _videoController!.setVolume(0);
@@ -279,18 +283,18 @@ class _MediaDisplayWidgetState extends State<MediaDisplayWidget> {
     }
 
     // Default to Image.network
-    return Image.network(
-      resolvedUrl,
+    // Default to CachedNetworkImage
+    return CachedNetworkImage(
+      imageUrl: resolvedUrl,
       fit: widget.fit,
       width: double.infinity,
       height: double.infinity,
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) return child;
-        return const Center(child: CircularProgressIndicator());
-      },
-      errorBuilder:
-          (context, error, stackTrace) =>
+      placeholder:
+          (context, url) => const Center(child: CircularProgressIndicator()),
+      errorWidget:
+          (context, url, error) =>
               const Center(child: Icon(Icons.error, size: 50)),
+      fadeInDuration: const Duration(milliseconds: 300),
     );
   }
 }

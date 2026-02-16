@@ -17,6 +17,7 @@ class RoomListingModel {
   final String school;
   final int reportCount;
   final bool isFeatured;
+  final bool isOwnerVerified;
 
   RoomListingModel({
     required this.id,
@@ -37,6 +38,7 @@ class RoomListingModel {
     required this.school,
     this.reportCount = 0,
     this.isFeatured = false,
+    this.isOwnerVerified = false,
   });
 
   factory RoomListingModel.fromJson(Map<String, dynamic> json) {
@@ -72,6 +74,8 @@ class RoomListingModel {
       school: json['school'] ?? '',
       reportCount: json['report_count'] ?? 0,
       isFeatured: json['is_featured'] ?? false,
+      isOwnerVerified:
+          json['is_owner_verified'] ?? json['isOwnerVerified'] ?? false,
     );
   }
 
@@ -95,6 +99,7 @@ class RoomListingModel {
       'school': school,
       'report_count': reportCount,
       'is_featured': isFeatured,
+      'is_owner_verified': isOwnerVerified,
     };
   }
 }

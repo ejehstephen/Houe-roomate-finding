@@ -1,9 +1,7 @@
 import 'package:camp_nest/feature/presentation/provider/listing_provider.dart';
-import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
 import 'package:camp_nest/feature/presentation/widget/roomcard.dart';
 import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:camp_nest/feature/presentation/screens/post_listing_screen.dart';
-import 'package:camp_nest/feature/presentation/screens/verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -113,41 +111,9 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
         delay: 0.5,
         child: FloatingActionButton.extended(
           onPressed: () {
-            final user = ref.read(authProvider).user;
-            if (user?.isVerified == true) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PostListingScreen()),
-              );
-            } else {
-              showDialog(
-                context: context,
-                builder:
-                    (context) => AlertDialog(
-                      title: const Text('Verification Required'),
-                      content: const Text(
-                        'To ensure trust and safety, you must verify your identity before posting a room listing.',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        FilledButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder:
-                                    (context) => const VerificationScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text('Verify Identity'),
-                        ),
-                      ],
-                    ),
-              );
-            }
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PostListingScreen()),
+            );
           },
           label: const Text('Add Listing'),
           icon: const Icon(Icons.add),

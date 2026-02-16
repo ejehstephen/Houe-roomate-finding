@@ -50,7 +50,10 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
     String sort = 'created_at',
     String order = 'desc',
     String? query,
+    bool force = false,
   }) async {
+    if (!force && state.isLoading) return;
+
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -67,7 +70,20 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
         query: query,
       );
       if (!mounted) return;
-      state = state.copyWith(listings: listings, isLoading: false, error: null);
+
+      if (page == 0) {
+        state = state.copyWith(
+          listings: listings,
+          isLoading: false, // Ensure loading is false
+          error: null,
+        );
+      } else {
+        state = state.copyWith(
+          listings: [...state.listings, ...listings],
+          isLoading: false, // Ensure loading is false
+          error: null,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);
@@ -85,7 +101,7 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
 
       // After posting, refetch ALL listings from the database so the user
       // sees everyone's listings (not just their own).
-      await loadAllListings();
+      await loadAllListings(force: true);
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);
@@ -129,29 +145,52 @@ class ListingsNotifier extends StateNotifier<ListingsState> {
   }
 
   // Load all listings (no search filters)
-  Future<void> loadAllListings() async {
+  Future<void> loadAllListings({
+    bool force = false,
+    int page = 0,
+    int pageSize = 10,
+  }) async {
     // Don't reload if we're already loading
-    if (state.isLoading) return;
+    if (!force && state.isLoading) return;
 
     state = state.copyWith(isLoading: true, error: null);
     try {
       // 1. Try to fetch user's school listings
       var listings = await _listingsService.getAllListings(
         school: _resolveSchool,
+        page: page,
+        pageSize: pageSize,
       );
 
       // 2. If no listings found for school, fetch ALL listings (fallback)
       if (listings.isEmpty &&
+          page == 0 &&
           _resolveSchool != null &&
           _resolveSchool!.isNotEmpty) {
         print(
           'INFO: No listings found for $_resolveSchool. Fetching all listings.',
         );
-        listings = await _listingsService.getAllListings();
+        listings = await _listingsService.getAllListings(
+          page: page,
+          pageSize: pageSize,
+        );
       }
 
       if (!mounted) return;
-      state = state.copyWith(listings: listings, isLoading: false, error: null);
+
+      if (page == 0) {
+        state = state.copyWith(
+          listings: listings,
+          isLoading: false,
+          error: null,
+        );
+      } else {
+        state = state.copyWith(
+          listings: [...state.listings, ...listings],
+          isLoading: false,
+          error: null,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       state = state.copyWith(error: e.toString(), isLoading: false);

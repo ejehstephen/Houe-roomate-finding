@@ -7,7 +7,7 @@ class VerificationService {
   /// Submit a new verification request
   Future<Map<String, dynamic>> submitVerificationRequest({
     required String fullName,
-    required DateTime dateOfBirth,
+    DateTime? dateOfBirth,
     required String ninNumber,
     required String documentType,
     required XFile frontImage,
@@ -46,7 +46,7 @@ class VerificationService {
       final data = {
         'user_id': userId,
         'full_name': fullName,
-        'date_of_birth': dateOfBirth.toIso8601String(),
+        'date_of_birth': (dateOfBirth ?? DateTime.now()).toIso8601String(),
         'nin_number': ninNumber,
         'document_type': documentType,
         'front_image_url': frontPath, // Storing path, not public URL

@@ -17,17 +17,46 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
   final double _priceMax = 2000;
   double _maxPrice = 2000;
   String _selectedGender = 'any';
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 0;
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _applyFilters();
     });
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      final isLoading = ref.read(searchListingsProvider).isLoading;
+      if (!isLoading) {
+        _currentPage++;
+        ref
+            .read(searchListingsProvider.notifier)
+            .loadListings(
+              maxPrice: _maxPrice < _priceMax ? _maxPrice : null,
+              query: _searchQuery.isNotEmpty ? _searchQuery : null,
+              genderPreference:
+                  _selectedGender != 'any' ? _selectedGender : null,
+              page: _currentPage,
+            );
+      }
+    }
+  }
+
   void _applyFilters() {
+    _currentPage = 0; // Reset pagination
     // Call the provider to load listings with current filters
     ref
         .read(searchListingsProvider.notifier)
@@ -35,6 +64,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
           maxPrice: _maxPrice < _priceMax ? _maxPrice : null,
           query: _searchQuery.isNotEmpty ? _searchQuery : null,
           genderPreference: _selectedGender != 'any' ? _selectedGender : null,
+          page: 0,
         );
   }
 
@@ -66,6 +96,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                   child: CustomScrollView(
+                    controller: _scrollController,
                     scrollDirection: Axis.vertical,
                     slivers: [
                       // App Bar
@@ -146,7 +177,7 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                       ),
 
                       // Listings content
-                      if (_isLoading)
+                      if (_isLoading && _filteredListings.isEmpty)
                         const SliverFillRemaining(
                           child: Center(child: CircularProgressIndicator()),
                         )
@@ -191,21 +222,35 @@ class _ListingsScreenState extends ConsumerState<ListingsScreen> {
                         SliverPadding(
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate((
-                              context,
-                              index,
-                            ) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 16),
-                                child: FadeInSlide(
-                                  duration: 0.5,
-                                  delay: index * 0.1,
-                                  child: RoomCard(
-                                    listing: _filteredListings[index],
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                // Show loading indicator at the bottom
+                                if (index == _filteredListings.length) {
+                                  return const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 16.0,
+                                    ),
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 16),
+                                  child: FadeInSlide(
+                                    duration: 0.5,
+                                    delay: 0.1,
+                                    child: RoomCard(
+                                      listing: _filteredListings[index],
+                                    ),
                                   ),
-                                ),
-                              );
-                            }, childCount: _filteredListings.length),
+                                );
+                              },
+                              childCount:
+                                  _filteredListings.length +
+                                  (_isLoading ? 1 : 0),
+                            ),
                           ),
                         ),
 

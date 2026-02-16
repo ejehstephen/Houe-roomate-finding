@@ -13,7 +13,6 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:camp_nest/feature/presentation/widgets/fade_in_slide.dart';
 import 'package:camp_nest/feature/presentation/screens/notification.dart';
 import 'package:camp_nest/feature/presentation/provider/notification_provider.dart';
-import 'package:camp_nest/feature/presentation/screens/verification_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +23,8 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 0;
   int _currentIndex = 0;
   Timer? _verificationTimer;
 
@@ -31,6 +32,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_onScroll);
+
     // Load listings when home screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _initializeWithTokenCheck();
@@ -42,7 +45,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _verificationTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      final isLoading = ref.read(listingsProvider).isLoading;
+      if (!isLoading) {
+        _currentPage++;
+        ref
+            .read(listingsProvider.notifier)
+            .loadAllListings(page: _currentPage, force: true);
+      }
+    }
   }
 
   void _startVerificationCheckTimer() {
@@ -66,10 +83,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Refresh user data AND listings when app comes to foreground
-      print('📱 App resumed - refreshing user data and listings...');
+      // Refresh user data when app resumes
       ref.read(authProvider.notifier).refreshUser();
-      ref.read(listingsProvider.notifier).loadAllListings();
+      // Also refresh listings to get latest verification status
+      ref.read(listingsProvider.notifier).loadAllListings(force: true);
+      _currentPage = 0; // Reset pagination on refresh
     }
   }
 
@@ -205,9 +223,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 constraints: const BoxConstraints(maxWidth: 600),
                 child: RefreshIndicator(
                   onRefresh: () async {
+                    _currentPage = 0; // Reset pagination
                     // Refresh both listings and user data (to check verification status)
                     await Future.wait([
-                      ref.read(listingsProvider.notifier).loadAllListings(),
+                      ref
+                          .read(listingsProvider.notifier)
+                          .loadAllListings(force: true, page: 0),
                       ref.read(authProvider.notifier).refreshUser(),
                     ]);
                   },
@@ -216,6 +237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       horizontal: horizontalPadding,
                     ),
                     child: CustomScrollView(
+                      controller: _scrollController,
                       slivers: [
                         SliverPadding(
                           padding: const EdgeInsets.only(top: 24),
@@ -227,102 +249,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 FadeInSlide(
                                   duration: 0.6,
                                   delay: 0.1,
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: _ActionCard(
-                                          title: 'Find a Room',
-                                          subtitle: 'Browse available rooms',
-                                          icon: Icons.search_rounded,
-                                          color: Theme.of(context).primaryColor,
-                                          onTap: () {
-                                            Navigator.of(context).push(
-                                              MaterialPageRoute(
-                                                builder:
-                                                    (context) =>
-                                                        const ListingsScreen(),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: _ActionCard(
-                                          title: 'Find Roommate',
-                                          subtitle: 'Take compatibility quiz',
-                                          icon: Icons.people_alt_rounded,
-                                          color:
-                                              Theme.of(
-                                                context,
-                                              ).colorScheme.secondary,
-                                          onTap: () {
-                                            final user =
-                                                ref.read(authProvider).user;
-                                            final hasImage =
-                                                user?.profileImage != null &&
-                                                user!.profileImage!.isNotEmpty;
-                                            final hasPhone =
-                                                user?.phoneNumber != null &&
-                                                user!.phoneNumber!.isNotEmpty;
-
-                                            if (!hasImage || !hasPhone) {
-                                              showDialog(
-                                                context: context,
-                                                builder:
-                                                    (context) => AlertDialog(
-                                                      title: const Text(
-                                                        'Complete Profile',
-                                                      ),
-                                                      content: const Text(
-                                                        'To find a roommate, you need to add a profile picture and a phone number. This helps others trust and contact you.',
-                                                      ),
-                                                      actions: [
-                                                        TextButton(
-                                                          onPressed:
-                                                              () =>
-                                                                  Navigator.pop(
-                                                                    context,
-                                                                  ),
-                                                          child: const Text(
-                                                            'Cancel',
-                                                          ),
-                                                        ),
-                                                        FilledButton(
-                                                          onPressed: () {
-                                                            Navigator.pop(
-                                                              context,
-                                                            );
-                                                            Navigator.of(
-                                                              context,
-                                                            ).push(
-                                                              MaterialPageRoute(
-                                                                builder:
-                                                                    (context) =>
-                                                                        const ProfileScreen(),
-                                                              ),
-                                                            );
-                                                          },
-                                                          child: const Text(
-                                                            'Go to Profile',
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                              );
-                                            } else {
+                                  child: IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(
+                                          child: _ActionCard(
+                                            title: 'Find a Room',
+                                            subtitle: 'Browse available rooms',
+                                            icon: Icons.search_rounded,
+                                            color:
+                                                Theme.of(context).primaryColor,
+                                            onTap: () {
                                               Navigator.of(context).push(
                                                 MaterialPageRoute(
                                                   builder:
                                                       (context) =>
-                                                          const QuestionnaireScreen(),
+                                                          const ListingsScreen(),
                                                 ),
                                               );
-                                            }
-                                          },
+                                            },
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: _ActionCard(
+                                            title: 'Find Roommate',
+                                            subtitle: 'Take compatibility quiz',
+                                            icon: Icons.people_alt_rounded,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.secondary,
+                                            onTap: () {
+                                              final user =
+                                                  ref.read(authProvider).user;
+                                              final hasImage =
+                                                  user?.profileImage != null &&
+                                                  user!
+                                                      .profileImage!
+                                                      .isNotEmpty;
+                                              final hasPhone =
+                                                  user?.phoneNumber != null &&
+                                                  user!.phoneNumber!.isNotEmpty;
+
+                                              if (!hasImage || !hasPhone) {
+                                                showDialog(
+                                                  context: context,
+                                                  builder:
+                                                      (context) => AlertDialog(
+                                                        title: const Text(
+                                                          'Complete Profile',
+                                                        ),
+                                                        content: const Text(
+                                                          'To find a roommate, you need to add a profile picture and a phone number. This helps others trust and contact you.',
+                                                        ),
+                                                        actions: [
+                                                          TextButton(
+                                                            onPressed:
+                                                                () =>
+                                                                    Navigator.pop(
+                                                                      context,
+                                                                    ),
+                                                            child: const Text(
+                                                              'Cancel',
+                                                            ),
+                                                          ),
+                                                          FilledButton(
+                                                            onPressed: () {
+                                                              Navigator.pop(
+                                                                context,
+                                                              );
+                                                              Navigator.of(
+                                                                context,
+                                                              ).push(
+                                                                MaterialPageRoute(
+                                                                  builder:
+                                                                      (
+                                                                        context,
+                                                                      ) =>
+                                                                          const ProfileScreen(),
+                                                                ),
+                                                              );
+                                                            },
+                                                            child: const Text(
+                                                              'Go to Profile',
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                );
+                                              } else {
+                                                Navigator.of(context).push(
+                                                  MaterialPageRoute(
+                                                    builder:
+                                                        (context) =>
+                                                            const QuestionnaireScreen(),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
 
@@ -365,7 +396,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ),
 
                         // Featured listings content
-                        if (listingsState.isLoading)
+                        if (listingsState.isLoading &&
+                            listingsState.listings.isEmpty)
                           const SliverFillRemaining(
                             child: Center(child: CircularProgressIndicator()),
                           )
@@ -423,23 +455,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           SliverPadding(
                             padding: const EdgeInsets.only(bottom: 24),
                             sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate((
-                                context,
-                                index,
-                              ) {
-                                final listing = listingsState.listings[index];
-                                return FadeInSlide(
-                                  duration: 0.5,
-                                  delay:
-                                      0.1 * (index + 1), // Staggered animation
-                                  child: Container(
-                                    width: double.infinity,
-                                    height: 470,
-                                    margin: const EdgeInsets.only(bottom: 24),
-                                    child: RoomCard(listing: listing),
-                                  ),
-                                );
-                              }, childCount: listingsState.listings.length),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  // Show loading indicator at the bottom
+                                  if (index == listingsState.listings.length) {
+                                    return const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 16.0,
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    );
+                                  }
+
+                                  final listing = listingsState.listings[index];
+                                  return FadeInSlide(
+                                    duration: 0.5,
+                                    delay:
+                                        0.1, // Reduced delay for smoother scrolling
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: 470,
+                                      margin: const EdgeInsets.only(bottom: 24),
+                                      child: RoomCard(listing: listing),
+                                    ),
+                                  );
+                                },
+                                // Add 1 to count if loading and we have items
+                                childCount:
+                                    listingsState.listings.length +
+                                    (listingsState.isLoading ? 1 : 0),
+                              ),
                             ),
                           ),
                       ],
@@ -482,44 +529,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   );
                 } else if (index == 2) {
-                  final user = ref.read(authProvider).user;
-                  if (user?.isVerified == true) {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => const PostListingScreen(),
-                      ),
-                    );
-                  } else {
-                    showDialog(
-                      context: context,
-                      builder:
-                          (context) => AlertDialog(
-                            title: const Text('Verification Required'),
-                            content: const Text(
-                              'To ensure trust and safety, you must verify your identity before posting a room listing.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Cancel'),
-                              ),
-                              FilledButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder:
-                                          (context) =>
-                                              const VerificationScreen(),
-                                    ), // Needs import
-                                  );
-                                },
-                                child: const Text('Verify Identity'),
-                              ),
-                            ],
-                          ),
-                    );
-                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const PostListingScreen(),
+                    ),
+                  );
                 } else if (index == 3) {
                   Navigator.of(context).push(
                     MaterialPageRoute(

@@ -21,7 +21,7 @@ class VerificationNotifier extends StateNotifier<AsyncValue<void>> {
 
   Future<void> submitVerification({
     required String fullName,
-    required DateTime dateOfBirth,
+    DateTime? dateOfBirth,
     required String ninNumber,
     required String documentType,
     required XFile frontImage,
