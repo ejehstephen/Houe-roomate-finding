@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,21 +19,122 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description"
+    content="Find compatible roommates and perfect student housing. Connect with students who share your lifestyle and preferences.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="camp_nest">
+  <meta name="apple-mobile-web-app-title" content="CampNest">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
+  <link rel="icon" type="image/png" href="favicon.png" />
 
-  <title>camp_nest</title>
+  <title>CampsNest - Student House,Roommate Finder</title>
   <link rel="manifest" href="manifest.json">
 </head>
+<style>
+  body {
+    background-color: #F8F9FA;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .logo-img {
+    width: 120px;
+    height: 120px;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    /* Since the splash screen logic depends on loading assets, we'll use base64 or an external reference if needed.
+         But utilizing the favicon is smartest here since it's already tiny and downloaded. */
+    content: url("favicon.png");
+    animation: pulse 2s infinite ease-in-out;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #E0E0E0;
+    border-top: 4px solid #0056D2;
+    /* Primary app blue */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .loading-text {
+    color: #555;
+    font-weight: 500;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.05);
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+</style>
+</head>
+
 <body>
+  <div class="loading-container" id="loading-indicator">
+    <div class="logo-img"></div>
+    <div class="spinner"></div>
+    <div class="loading-text">Loading CampNest...</div>
+  </div>
+
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Note: The flutter_bootstrap.js handles canvas injection. 
+    // We listen to the window load to remove the indicator, though 
+    // ideally Flutter automatically clears the DOM when it attaches.
+    // If not, we can manually prune it.
+    window.addEventListener('flutter-first-frame', function () {
+      var loadingIndicator = document.getElementById('loading-indicator');
+      if (loadingIndicator) {
+        loadingIndicator.remove();
+      }
+    });
+
+    // Alternatively, if flutter-first-frame isn't firing on older web setups:
+    setTimeout(function () {
+      var loadingIndicator = document.getElementById('loading-indicator');
+      if (loadingIndicator && document.querySelector('flt-glass-pane')) {
+        loadingIndicator.remove();
+      }
+    }, 3000);
+  </script>
 </body>
+
 </html>

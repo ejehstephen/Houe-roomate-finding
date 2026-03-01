@@ -459,4 +459,18 @@ class AuthService {
     }
     return profile;
   }
+
+  // ========================= ACTIVITY TRACKING =========================
+
+  Future<void> updateLastActive() async {
+    try {
+      final user = _client.auth.currentUser;
+      if (user != null) {
+        await _client.rpc('update_user_activity', params: {'user_id': user.id});
+      }
+    } catch (e) {
+      print('Error updating user activity: $e');
+      // Fail silently as this is background task
+    }
+  }
 }

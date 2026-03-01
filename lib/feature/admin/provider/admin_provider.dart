@@ -13,6 +13,11 @@ final adminStatsProvider = FutureProvider<Map<String, int>>((ref) async {
   return service.getPlatformStats();
 });
 
+final adminActiveUsersProvider = FutureProvider<Map<String, int>>((ref) async {
+  final service = ref.watch(adminServiceProvider);
+  return service.getActiveUserStats();
+});
+
 final adminUsersProvider = FutureProvider<List<UserModel>>((ref) async {
   final service = ref.watch(adminServiceProvider);
   return service.getAllUsers();

@@ -78,11 +78,60 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
       final List<XFile> picked = await _picker.pickMultipleMedia();
       if (picked.isEmpty) return;
 
-      final limited = picked.take(5 - _selectedImages.length).toList();
+      int currentVideos =
+          kIsWeb
+              ? _selectedFilenames.where((f) => _isVideo(f)).length
+              : _selectedImages.where((f) => _isVideo(f.path)).length;
+
+      int currentTotal =
+          kIsWeb ? _selectedImageBytes.length : _selectedImages.length;
+
+      List<XFile> validPicks = [];
+      bool videosSkipped = false;
+      bool totalSkipped = false;
+
+      for (var file in picked) {
+        if (currentTotal >= 5) {
+          totalSkipped = true;
+          break; // Stop adding, reached max capacity of 5
+        }
+
+        bool isVid = _isVideo(file.name);
+
+        if (isVid) {
+          if (currentVideos >= 1) {
+            videosSkipped = true;
+            continue; // Skip this video, but allow looking for images if space remains
+          } else {
+            validPicks.add(file);
+            currentVideos++;
+            currentTotal++;
+          }
+        } else {
+          // It's an image
+          validPicks.add(file);
+          currentTotal++;
+        }
+      }
+
+      if (videosSkipped || totalSkipped) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Allowed limit: Max 5 files total, and max 1 video. Oversized selections were skipped.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+
+      if (validPicks.isEmpty) return;
+
       if (kIsWeb) {
         // Store bytes and names for web
-        for (final x in limited) {
-          if (_selectedImageBytes.length >= 5) break;
+        for (final x in validPicks) {
           final b = await x.readAsBytes();
           setState(() {
             _selectedImageBytes.add(b);
@@ -91,18 +140,27 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
         }
       } else {
         setState(() {
-          if (_selectedImages.length < 5) {
-            _selectedImages.addAll(limited.map((x) => File(x.path)));
-          }
+          _selectedImages.addAll(validPicks.map((x) => File(x.path)));
         });
       }
     } catch (e) {
-      e.showError(context, duration: const Duration(seconds: 4));
+      e.showError(context, duration: const Duration(seconds: 5));
     }
   }
 
   Future<void> _takePicture() async {
     try {
+      int currentTotal =
+          kIsWeb ? _selectedImageBytes.length : _selectedImages.length;
+      if (currentTotal >= 5) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Maximum 5 files allowed.')),
+          );
+        }
+        return;
+      }
+
       final XFile? image = await _picker.pickImage(
         source: ImageSource.camera,
         maxWidth: 1024,
@@ -168,7 +226,7 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                           await _pickImages();
                         },
                         icon: const Icon(Icons.photo_library),
-                        label: const Text('Photos & Videos'),
+                        label: const Text('Gallery'),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -435,11 +493,11 @@ class _PostListingScreenState extends ConsumerState<PostListingScreen> {
                                 ),
                                 SizedBox(height: 8),
                                 Text(
-                                  'Tap to Add Photos',
+                                  'Tap to Add Photos/Videos',
                                   style: TextStyle(color: Colors.grey),
                                 ),
                                 Text(
-                                  '(Up to 5 images)',
+                                  '(Up to 5 files, max 1 video)',
                                   style: TextStyle(
                                     color: Colors.grey,
                                     fontSize: 12,

@@ -27,13 +27,15 @@ class RoomMatchApp extends ConsumerStatefulWidget {
   ConsumerState<RoomMatchApp> createState() => _RoomMatchAppState();
 }
 
-class _RoomMatchAppState extends ConsumerState<RoomMatchApp> {
+class _RoomMatchAppState extends ConsumerState<RoomMatchApp>
+    with WidgetsBindingObserver {
   // Global key to navigate without context availability in listener
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Listen for Auth Events (Deep Linking)
     Supabase.instance.client.auth.onAuthStateChange.listen((data) {
       final event = data.event;
@@ -45,8 +47,30 @@ class _RoomMatchAppState extends ConsumerState<RoomMatchApp> {
       } else if (event == AuthChangeEvent.signedIn) {
         // Refresh provider so UI (AuthScreen/SplashScreen) can react
         ref.read(authProvider.notifier).refreshUser();
+        // Track activity on login
+        _trackActivity();
       }
     });
+    // Track activity on app start
+    _trackActivity();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _trackActivity();
+    }
+  }
+
+  void _trackActivity() {
+    print('📲 App Active: Updating last active timestamp...');
+    ref.read(authServiceProvider).updateLastActive();
   }
 
   @override

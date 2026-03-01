@@ -17,6 +17,16 @@ class AdminService {
     }
   }
 
+  Future<Map<String, int>> getActiveUserStats() async {
+    try {
+      final response = await _client.rpc('admin_get_active_user_stats');
+      return Map<String, int>.from(response as Map);
+    } catch (e) {
+      print('Error getting active user stats: $e');
+      throw Exception('Failed to get active user stats');
+    }
+  }
+
   // --- Users ---
   Future<List<UserModel>> getAllUsers() async {
     try {
@@ -25,6 +35,7 @@ class AdminService {
                   .from('users')
                   .select()
                   .order('created_at', ascending: false)
+                  .limit(50)
               as List;
       return response.map((e) => UserModel.fromJson(e)).toList();
     } catch (e) {
@@ -77,7 +88,34 @@ class AdminService {
     }
   }
 
-  // --- Listings ---
+  Future<void> makeAdmin(String userId) async {
+    try {
+      await _client.from('users').update({'role': 'admin'}).eq('id', userId);
+      await sendNotification(
+        userId,
+        'Admin Access Granted',
+        'You have been granted admin access to CampNest.',
+      );
+    } catch (e) {
+      print('Error making admin: $e');
+      throw Exception('Failed to make user admin');
+    }
+  }
+
+  Future<void> removeAdmin(String userId) async {
+    try {
+      await _client.from('users').update({'role': 'user'}).eq('id', userId);
+      await sendNotification(
+        userId,
+        'Admin Access Removed',
+        'Your admin access to CampNest has been removed.',
+      );
+    } catch (e) {
+      print('Error removing admin: $e');
+      throw Exception('Failed to remove admin role');
+    }
+  }
+
   Future<List<RoomListingModel>> getAllListings() async {
     try {
       final response =
@@ -91,6 +129,7 @@ class AdminService {
             owner:users!room_listings_owner_id_fkey (name, phone_number)
           ''')
                   .order('created_at', ascending: false)
+                  .limit(50)
               as List;
 
       // We need to transform data similarly to ListingService,
@@ -171,6 +210,7 @@ class AdminService {
             reported_listing:room_listings!reports_reported_listing_id_fkey(title)
           ''')
                   .order('created_at', ascending: false)
+                  .limit(50)
               as List;
       return response.map((e) {
         final map = Map<String, dynamic>.from(e);

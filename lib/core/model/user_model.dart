@@ -11,6 +11,8 @@ class UserModel {
   final String role;
   final bool isBanned;
   final bool isVerified;
+  final bool isSuperAdmin;
+  final DateTime? lastActiveAt;
 
   UserModel({
     required this.id,
@@ -25,6 +27,8 @@ class UserModel {
     this.role = 'user',
     this.isBanned = false,
     this.isVerified = false,
+    this.isSuperAdmin = false,
+    this.lastActiveAt,
   });
 
   // ✅ Add copyWith method
@@ -41,6 +45,8 @@ class UserModel {
     String? role,
     bool? isBanned,
     bool? isVerified,
+    bool? isSuperAdmin,
+    DateTime? lastActiveAt,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -55,6 +61,8 @@ class UserModel {
       role: role ?? this.role,
       isBanned: isBanned ?? this.isBanned,
       isVerified: isVerified ?? this.isVerified,
+      isSuperAdmin: isSuperAdmin ?? this.isSuperAdmin,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
   }
 
@@ -86,6 +94,11 @@ class UserModel {
       role: json['role'] ?? 'user',
       isBanned: json['is_banned'] ?? false,
       isVerified: json['is_verified'] ?? false,
+      isSuperAdmin: json['is_super_admin'] ?? false,
+      lastActiveAt:
+          json['last_active_at'] != null
+              ? DateTime.tryParse(json['last_active_at'].toString())
+              : null,
     );
   }
 
@@ -104,6 +117,8 @@ class UserModel {
       'role': role,
       'is_banned': isBanned,
       'is_verified': isVerified,
+      'is_super_admin': isSuperAdmin,
+      'last_active_at': lastActiveAt?.toIso8601String(),
     };
   }
 

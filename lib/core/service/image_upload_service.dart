@@ -2,7 +2,10 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:video_compress/video_compress.dart';
 
 class ImageUploadService {
   final SupabaseClient _client = Supabase.instance.client;
@@ -20,13 +23,38 @@ class ImageUploadService {
       final fileName =
           '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
-      final bytes = await imageFile.readAsBytes();
+      Uint8List? finalBytes;
+
+      if (!kIsWeb) {
+        if (['jpg', 'jpeg', 'png', 'webp'].contains(fileExt)) {
+          // Compress image aggressively
+          final compressed = await FlutterImageCompress.compressWithFile(
+            imageFile.absolute.path,
+            minWidth: 800,
+            minHeight: 800,
+            quality: 50,
+          );
+          if (compressed != null) finalBytes = compressed;
+        } else if (['mp4', 'mov', 'avi'].contains(fileExt)) {
+          // Compress video to very low quality
+          final mediaInfo = await VideoCompress.compressVideo(
+            imageFile.absolute.path,
+            quality: VideoQuality.LowQuality,
+            deleteOrigin: false,
+          );
+          if (mediaInfo != null && mediaInfo.file != null) {
+            finalBytes = await mediaInfo.file!.readAsBytes();
+          }
+        }
+      }
+
+      finalBytes ??= await imageFile.readAsBytes();
 
       await _client.storage
           .from(bucketName)
           .uploadBinary(
             fileName,
-            bytes,
+            finalBytes,
             fileOptions: FileOptions(
               contentType: _getContentType(fileExt),
               upsert: false,
@@ -58,11 +86,29 @@ class ImageUploadService {
       final fileName =
           '$userId/${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
+      Uint8List finalBytes = bytes;
+
+      if (!kIsWeb) {
+        if (['jpg', 'jpeg', 'png', 'webp'].contains(fileExt)) {
+          try {
+            final compressedBytes = await FlutterImageCompress.compressWithList(
+              bytes,
+              minWidth: 800,
+              minHeight: 800,
+              quality: 50,
+            );
+            finalBytes = compressedBytes;
+          } catch (e) {
+            print('Image compression failed for bytes, using original: $e');
+          }
+        }
+      }
+
       await _client.storage
           .from(bucketName)
           .uploadBinary(
             fileName,
-            bytes,
+            finalBytes,
             fileOptions: FileOptions(
               contentType: _getContentType(fileExt),
               upsert: false,

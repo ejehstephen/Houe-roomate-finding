@@ -9,7 +9,7 @@ class AdminOverviewTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(adminStatsProvider);
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -21,29 +21,77 @@ class AdminOverviewTab extends ConsumerWidget {
           const SizedBox(height: 16),
           statsAsync.when(
             data:
-                (stats) => GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
+                (stats) => Column(
                   children: [
-                    _StatCard(
-                      title: 'Total Users',
-                      value: stats['total_users'].toString(),
-                      icon: Icons.people,
-                      color: Colors.blue,
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      children: [
+                        _StatCard(
+                          title: 'Total Users',
+                          value: stats['total_users'].toString(),
+                          icon: Icons.people,
+                          color: Colors.blue,
+                        ),
+                        _StatCard(
+                          title: 'Active Listings',
+                          value: stats['active_listings'].toString(),
+                          icon: Icons.home,
+                          color: Colors.green,
+                        ),
+                        _StatCard(
+                          title: 'Pending Reports',
+                          value: stats['pending_reports'].toString(),
+                          icon: Icons.flag,
+                          color: Colors.orange,
+                        ),
+                      ],
                     ),
-                    _StatCard(
-                      title: 'Active Listings',
-                      value: stats['active_listings'].toString(),
-                      icon: Icons.home,
-                      color: Colors.green,
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Active Users (Activity)',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    _StatCard(
-                      title: 'Pending Reports',
-                      value: stats['pending_reports'].toString(),
-                      icon: Icons.flag,
-                      color: Colors.orange,
+                    const SizedBox(height: 16),
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final activeStats = ref.watch(adminActiveUsersProvider);
+                        return activeStats.when(
+                          data:
+                              (active) => Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _MiniStat(
+                                    label: 'Daily',
+                                    value: active['daily'].toString(),
+                                    color: Colors.green,
+                                  ),
+                                  _MiniStat(
+                                    label: 'Weekly',
+                                    value: active['weekly'].toString(),
+                                    color: Colors.blue,
+                                  ),
+                                  _MiniStat(
+                                    label: 'Monthly',
+                                    value: active['monthly'].toString(),
+                                    color: Colors.purple,
+                                  ),
+                                ],
+                              ),
+                          loading:
+                              () => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                          error: (e, s) => Text('Error loading activity'),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -154,20 +202,55 @@ class _StatCard extends StatelessWidget {
       elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(title, style: const TextStyle(fontSize: 16)),
-          ],
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 40, color: color),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(title, style: const TextStyle(fontSize: 16)),
+            ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _MiniStat({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(label, style: const TextStyle(color: Colors.grey)),
+      ],
     );
   }
 }
