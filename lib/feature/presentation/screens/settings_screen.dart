@@ -95,7 +95,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 delay: 0.5,
                 child: Center(
                   child: Text(
-                    'CampNest v1.0.0',
+                    'CampsNest v1.0.0',
                     style: TextStyle(color: Colors.grey[500], fontSize: 13),
                   ),
                 ),

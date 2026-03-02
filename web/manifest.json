@@ -1,6 +1,6 @@
 {
-    "name": "CampNest - Student Roommate Finder",
-    "short_name": "CampNest",
+    "name": "CampsNest - Student Roommate Finder",
+    "short_name": "CampsNest",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

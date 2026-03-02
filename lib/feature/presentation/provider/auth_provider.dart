@@ -149,8 +149,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final dummyUser = UserModel(
       id: 'dummy_user_123',
       name: 'Guest User',
-      email: 'guest@campnest.com',
-      school: 'CampNest University',
+      email: 'guest@campsnest.com',
+      school: 'CampsNest University',
       age: 21,
       gender: 'other',
       profileImage: null,

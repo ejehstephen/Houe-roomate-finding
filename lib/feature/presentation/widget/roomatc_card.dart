@@ -1,8 +1,10 @@
 import 'package:camp_nest/core/model/roomate_matching.dart';
-import 'package:camp_nest/feature/presentation/provider/auth_provider.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:camp_nest/feature/presentation/screens/roommate_details_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RoommateCard extends ConsumerWidget {
@@ -19,174 +21,191 @@ class RoommateCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            // Header with profile and compatibility
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).primaryColor.withOpacity(0.2),
-                  backgroundImage: _resolveAvatarImage(),
-                  onBackgroundImageError:
-                      _resolveAvatarImage() != null ? (_, __) {} : null,
-                  child: _resolveAvatarChild(),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => RoommateDetailsScreen(
+                  match: match,
+                  avatarOverrideUrl: avatarOverrideUrl,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        match.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      Text(
-                        '${match.age} • ${match.school}',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Budget: \$${match.budget.toInt()}/month',
-                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                      ),
-                    ],
+          ),
+        );
+      },
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              // Header with profile and compatibility
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).primaryColor.withValues(alpha: 0.2),
+                    backgroundImage: _resolveAvatarImage(),
+                    onBackgroundImageError:
+                        _resolveAvatarImage() != null ? (_, __) {} : null,
+                    child: _resolveAvatarChild(),
                   ),
-                ),
-                Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getCompatibilityColor(match.compatibilityScore),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${match.compatibilityScore}%',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Match',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Common interests
-            if (match.commonInterests.isNotEmpty) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Common Interests',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[700],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children:
-                    match.commonInterests.map((interest) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.secondary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          interest,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context).colorScheme.secondary,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          match.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      );
-                    }).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // Preferences
-            if (match.preferences.isNotEmpty) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Lifestyle',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey[700],
+                        Text(
+                          '${match.age} • ${match.school}',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ...match.preferences.entries.take(3).map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
+                  Column(
                     children: [
-                      Icon(
-                        _getPreferenceIcon(entry.key),
-                        size: 16,
-                        color: Colors.grey[600],
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getCompatibilityColor(
+                            match.compatibilityScore,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${match.compatibilityScore}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_getPreferenceLabel(entry.key)}: ${entry.value}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Match',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
-                );
-              }),
-              const SizedBox(height: 16),
-            ],
+                ],
+              ),
 
-            // WhatsApp contact button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await _contactViaWhatsApp(context, ref);
-                },
-                icon: const Icon(Icons.chat, color: Colors.white, size: 16),
-                label: const Text('Contact via WhatsApp'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+              const SizedBox(height: 16),
+
+              // Common interests
+              if (match.commonInterests.isNotEmpty) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Common Interests',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children:
+                      match.commonInterests.map((interest) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.secondary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            interest,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.secondary,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Preferences
+              if (match.preferences.isNotEmpty) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Lifestyle',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...match.preferences.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _getPreferenceIcon(entry.key),
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_getPreferenceLabel(entry.key)}: ${entry.value}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const SizedBox(height: 16),
+              ],
+
+              // WhatsApp contact button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    await _contactViaWhatsApp(context, ref);
+                  },
+                  icon: const Icon(Icons.chat, color: Colors.white, size: 16),
+                  label: const Text('Contact via WhatsApp'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -202,12 +221,12 @@ class RoommateCard extends ConsumerWidget {
 
     // Check if it's a valid URL
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      return NetworkImage(url);
+      return CachedNetworkImageProvider(url, maxWidth: 150, maxHeight: 150);
     }
 
     // Fallback for relative paths
     if (url.startsWith('/')) {
-      return NetworkImage(url);
+      return CachedNetworkImageProvider(url, maxWidth: 150, maxHeight: 150);
     }
 
     return null;
@@ -239,8 +258,8 @@ class RoommateCard extends ConsumerWidget {
   }
 
   Color _getCompatibilityColor(int score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 80) return Colors.orange;
+    if (score >= 80) return Colors.green;
+    if (score >= 50) return Colors.orange;
     return Colors.red;
   }
 
@@ -290,7 +309,7 @@ class RoommateCard extends ConsumerWidget {
     }
 
     final message = Uri.encodeComponent(
-      "Hi ${match.name}! I found you through CampNest and would like to discuss potential roommate arrangements.",
+      "Hi ${match.name}! I found you through CampsNest and would like to discuss potential roommate arrangements.",
     );
 
     // 2. Generate candidate phone numbers
@@ -331,7 +350,7 @@ class RoommateCard extends ConsumerWidget {
             return;
           }
         } catch (e) {
-          print('Launch error for $cand: $e');
+          debugPrint('Launch error for $cand: $e');
         }
       }
     }

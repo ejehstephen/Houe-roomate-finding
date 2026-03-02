@@ -117,6 +117,9 @@ BEGIN
       AND LOWER(c.gender) = LOWER(v_gender)
       AND LOWER(c.school) = LOWER(v_school)
       AND c.is_banned = false
+      AND EXISTS (
+        SELECT 1 FROM questionnaire_answers qa2 WHERE qa2.user_id = c.id
+      )
   ),
   candidate_apartment AS (
     SELECT qa.user_id,

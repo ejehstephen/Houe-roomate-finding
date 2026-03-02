@@ -94,7 +94,7 @@ class AdminService {
       await sendNotification(
         userId,
         'Admin Access Granted',
-        'You have been granted admin access to CampNest.',
+        'You have been granted admin access to CampsNest.',
       );
     } catch (e) {
       print('Error making admin: $e');
@@ -108,7 +108,7 @@ class AdminService {
       await sendNotification(
         userId,
         'Admin Access Removed',
-        'Your admin access to CampNest has been removed.',
+        'Your admin access to CampsNest has been removed.',
       );
     } catch (e) {
       print('Error removing admin: $e');

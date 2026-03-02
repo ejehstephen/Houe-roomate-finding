@@ -25,7 +25,7 @@
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="CampNest">
+  <meta name="apple-mobile-web-app-title" content="CampsNest">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
@@ -33,85 +33,48 @@
 
   <title>CampsNest - Student House,Roommate Finder</title>
   <link rel="manifest" href="manifest.json">
-</head>
-<style>
-  body {
-    background-color: #F8F9FA;
-    margin: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    font-family: system-ui, -apple-system, sans-serif;
-  }
-
-  .loading-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-  }
-
-  .logo-img {
-    width: 120px;
-    height: 120px;
-    border-radius: 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-    /* Since the splash screen logic depends on loading assets, we'll use base64 or an external reference if needed.
-         But utilizing the favicon is smartest here since it's already tiny and downloaded. */
-    content: url("favicon.png");
-    animation: pulse 2s infinite ease-in-out;
-  }
-
-  .spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #E0E0E0;
-    border-top: 4px solid #0056D2;
-    /* Primary app blue */
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  .loading-text {
-    color: #555;
-    font-weight: 500;
-    font-size: 16px;
-    letter-spacing: 0.5px;
-  }
-
-  @keyframes spin {
-    0% {
-      transform: rotate(0deg);
+  <style>
+    body {
+      background-color: #FFFFFF;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
     }
 
-    100% {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes pulse {
-    0% {
-      transform: scale(1);
+    .loading-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
-    50% {
-      transform: scale(1.05);
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 0, 0, 0.05);
+      border-top: 3px solid rgba(0, 86, 210, 0.4);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
     }
 
-    100% {
-      transform: scale(1);
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
     }
-  }
-</style>
+  </style>
 </head>
 
 <body>
   <div class="loading-container" id="loading-indicator">
-    <div class="logo-img"></div>
     <div class="spinner"></div>
-    <div class="loading-text">Loading CampNest...</div>
   </div>
 
   <script src="flutter_bootstrap.js" async></script>

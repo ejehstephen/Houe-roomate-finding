@@ -80,7 +80,7 @@ class _RoomDetailScreenState extends ConsumerState<RoomDetailScreen> {
         await ref.read(listingsProvider.notifier).getSupportNumber();
 
     final message =
-        "Hi CampNest, I'm interested in the listing: ${widget.listing.title} located at ${widget.listing.location} (ID: ${widget.listing.id}). Is it still available?";
+        "Hi CampsNest, I'm interested in the listing: ${widget.listing.title} located at ${widget.listing.location} (ID: ${widget.listing.id}). Is it still available?";
     final url =
         "https://wa.me/$supportNumber?text=${Uri.encodeComponent(message)}";
 

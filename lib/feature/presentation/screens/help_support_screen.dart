@@ -23,7 +23,7 @@ class HelpSupportScreen extends StatelessWidget {
 
   Future<void> _launchEmail(BuildContext context) async {
     final uri = Uri.parse(
-      'mailto:$_email?subject=CampNest%20Support%20Request',
+      'mailto:$_email?subject=CampsNest%20Support%20Request',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
@@ -38,7 +38,7 @@ class HelpSupportScreen extends StatelessWidget {
 
   Future<void> _launchWhatsApp(BuildContext context) async {
     final uri = Uri.parse(
-      'https://wa.me/$_whatsappNumber?text=${Uri.encodeComponent("Hi! I need help with CampNest.")}',
+      'https://wa.me/$_whatsappNumber?text=${Uri.encodeComponent("Hi! I need help with CampsNest.")}',
     );
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -96,7 +96,7 @@ class HelpSupportScreen extends StatelessWidget {
 
               // ── How to Use the App Section ──
               _SectionTitle(
-                title: 'How to Use CampNest',
+                title: 'How to Use CampsNest',
                 icon: Icons.menu_book_outlined,
               ),
               const SizedBox(height: 12),
@@ -167,9 +167,9 @@ class HelpSupportScreen extends StatelessWidget {
               const SizedBox(height: 12),
 
               _FaqTile(
-                question: 'Is CampNest free to use?',
+                question: 'Is CampsNest free to use?',
                 answer:
-                    'Yes! CampNest is completely free for students. '
+                    'Yes! CampsNest is completely free for students. '
                     'You can browse listings, post rooms, and find roommates at no cost.',
               ),
               _FaqTile(
